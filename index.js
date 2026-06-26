@@ -19,6 +19,12 @@ const client = new Client({
     ]
 });
 
+const mongoose = require('mongoose');
+
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('Sukses terhubung ke Database Hogwarts!'))
+  .catch(err => console.error('Gagal terhubung ke database:', err));
+
 const houses = [
     {
         id: '1475605712938864796',
@@ -44,6 +50,62 @@ client.once(Events.ClientReady, () => {
 
 client.on(Events.MessageCreate, async (message) => {
 
+const User = require('./models/User'); 
+const LEVEL_UP_CHANNEL_ID = '1475801714425860272'; 
+
+function getWizardTitle(level) {
+    if (level >= 50) return '🧙‍♂️ Headmaster';
+    if (level >= 40) return '🛡️ Professor';
+    if (level >= 35) return '🎓 Graduate';
+    if (level >= 30) return '🧹 Seventh Year';
+    if (level >= 25) return '🦁 Sixth Year';
+    if (level >= 20) return '🐍 Fifth Year';
+    if (level >= 15) return '🦡 Fourth Year';
+    if (level >= 10) return '🦅 Third Year';
+    if (level >= 5)  return '📜 Second Year';
+    return '🌱 First Year';
+}
+
+const xpCooldowns = new Set();
+
+if (!message.author.bot && message.guild) {
+    const userId = message.author.id;
+    const guildId = message.guild.id;
+
+    if (!xpCooldowns.has(userId)) {
+        try {
+            let userData = await User.findOne({ userId, guildId });
+            if (!userData) {
+                userData = await User.create({ userId, guildId });
+            }
+
+            const xpGained = Math.floor(Math.random() * 11) + 15;
+            userData.xp += xpGained;
+
+            const xpNeeded = userData.level * 500;
+
+            if (userData.xp >= xpNeeded) {
+                userData.xp -= xpNeeded;
+                userData.level += 1;
+                
+                const newTitle = getWizardTitle(userData.level);
+                const levelUpChannel = message.guild.channels.cache.get(LEVEL_UP_CHANNEL_ID);
+                
+                if (levelUpChannel) {
+                    levelUpChannel.send(`✨ **Selamat!** <@${userId}> telah naik ke **Level ${userData.level}** dan sekarang bergelar **${newTitle}**! 🎓`);
+                }
+            }
+
+            await userData.save();
+
+            xpCooldowns.add(userId);
+            setTimeout(() => xpCooldowns.delete(userId), 60000);
+
+        } catch (err) {
+            console.error('Ada masalah saat memproses XP:', err);
+        }
+    }
+}
     if (message.author.bot) return;
 
     if (message.content === '!sortinghat') {
