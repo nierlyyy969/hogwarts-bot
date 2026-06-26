@@ -28,14 +28,15 @@ const client = new Client({
 const OWNER_ID = '1180180812327559310'; 
 const LEVEL_UP_CHANNEL_ID = '1475801714425860272'; 
 
-const houses = [
-    { id: '1475605712938864796', name: 'Gryffindor', emoji: '🦁' },
-    { id: '1475786100210401413', name: 'Slytherin', emoji: '🐍' },
-    { id: '1475786808167235604', name: 'Ravenclaw', emoji: '🦅' },
-    { id: '1475787032759631965', name: 'Hufflepuff', emoji: '🦡' }
+// Catatan ID Role Kelas/Asrama untuk pengecekan akses command
+const HOUSES_DATA = [
+    { id: '1475605712938864796', name: 'Gryffindor', emoji: '🦁', command: 'gryffindor' },
+    { id: '1475786100210401413', name: 'Slytherin', emoji: '🐍', command: 'slytherin' },
+    { id: '1475786808167235604', name: 'Ravenclaw', emoji: '🦅', command: 'ravenclaw' },
+    { id: '1475787032759631965', name: 'Hufflepuff', emoji: '🦡', command: 'hufflepuff' }
 ];
 
-// PENTING: Arahkan database ke /tmp/ agar saat bot update/restart, data level/point TIDAK HILANG!
+// PENTING: Database diarahkan ke /tmp/ agar saat bot update/restart level tidak reset
 const dataPath = path.join('/tmp', 'users_hogwarts.json');
 
 function getDbData() {
@@ -107,7 +108,7 @@ client.once(Events.ClientReady, () => {
 
                         db.users[userId].xp += 12;
 
-                        const userHouseObj = houses.find(h => voiceState.member.roles.cache.has(h.id));
+                        const userHouseObj = HOUSES_DATA.find(h => voiceState.member.roles.cache.has(h.id));
                         if (userHouseObj) {
                             db.housePoints[userHouseObj.name] += 1;
                             db.users[userId].pointsContributed += 1;
@@ -123,7 +124,6 @@ client.once(Events.ClientReady, () => {
                             xpNeeded = getXpNeededForNextLevel(db.users[userId].level);
                             levelUpOccurred = true;
 
-                            // Notifikasi Milestone kelipatan 5 (5, 10, 15, dst)
                             if (db.users[userId].level % 5 === 0) {
                                 reachedLevelCheckpoint = true;
                             }
@@ -160,7 +160,13 @@ client.once(Events.ClientReady, () => {
 });
 
 client.on(Events.GuildMemberRemove, (member) => {
-    // Proteksi data agar tidak terhapus saat member keluar server
+    // Opsional jika tetap ingin data user dihapus dari database saat keluar server
+    let db = getDbData();
+    if (db.users[member.id]) {
+        delete db.users[member.id];
+        saveDbData(db);
+        console.log(`🧹 Data level dari ${member.user.username} di-reset otomatis karena keluar server.`);
+    }
 });
 
 // ==========================================
@@ -174,11 +180,16 @@ client.on(Events.MessageCreate, async (message) => {
     const command = args[0].toLowerCase();
 
     const levelUpChannel = message.guild.channels.cache.get(LEVEL_UP_CHANNEL_ID) || message.channel;
-    const userHouseObj = houses.find(h => message.member.roles.cache.has(h.id));
+    const userHouseObj = HOUSES_DATA.find(h => message.member.roles.cache.has(h.id));
+
+    // Pengecekan Akses Umum: Memastikan command hanya bisa dipakai yang sudah punya role kelas/asrama
+    // Pengecualian: Owner/Lord of Magic (!setlevel, !givepoint, !sortinghat) tetap bisa akses
+    const isOwner = userId === OWNER_ID;
+    const isSorted = !!userHouseObj;
 
     // A. ADMIN COMMANDS (Khusus Lord / Owner Server)
     if (command === '!setlevel') {
-        if (userId !== OWNER_ID) return message.reply('❌ Hanya Lord yang berhak memanipulasi tingkat sihir!');
+        if (!isOwner) return message.reply('❌ Hanya Lord yang berhak memanipulasi tingkat sihir!');
         const targetUser = message.mentions.users.first();
         const newLevel = parseInt(args[2]);
 
@@ -197,13 +208,13 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     if (command === '!givepoint') {
-        if (userId !== OWNER_ID) return message.reply('❌ Hanya Lord yang bisa memberikan berkah poin asrama!');
+        if (!isOwner) return message.reply('❌ Hanya Lord yang bisa memberikan berkah poin asrama!');
         const targetMember = message.mentions.members.first();
         const points = parseInt(args[2]);
 
         if (!targetMember || isNaN(points)) return message.reply('🔮 **Format Salah!** Gunakan: `!givepoint @User <jumlah_poin>`');
 
-        const targetHouse = houses.find(h => targetMember.roles.cache.has(h.id));
+        const targetHouse = HOUSES_DATA.find(h => targetMember.roles.cache.has(h.id));
         if (!targetHouse) return message.reply('❌ Penyihir tersebut belum bergabung dengan asrama Hogwarts mana pun!');
 
         let db = getDbData();
@@ -217,7 +228,7 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     if (command === '!levelup') {
-        if (userId !== OWNER_ID) return message.reply('❌ Perintah ini khusus untuk Lord of Magic!');
+        if (!isOwner) return message.reply('❌ Perintah ini khusus untuk Lord of Magic!');
         const testEmbed = new EmbedBuilder()
             .setColor('#25a5cf')
             .setTitle('✨ Hogwarts Academy Level Up!')
@@ -228,7 +239,30 @@ client.on(Events.MessageCreate, async (message) => {
         return; 
     }
 
-    // B. GENERAL MAGICAL COMMANDS (Sistem Tampilan Profile Embed)
+    if (command === '!sortinghat') {
+        if (!isOwner) return message.reply('❌ Hanya Lord of Magic yang berhak memanggil The Sorting Hat!');
+
+        const embed = new EmbedBuilder()
+            .setColor('#25a5cf') 
+            .setTitle('🎩 The Sorting Hat')
+            .setDescription('Welcome to **Hogwarts Academy**\n\nSilahkan tekan tombol di bawah dan biarkan Sorting Hat menentukan kelasmu!');
+
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('sorting_hat').setLabel('Mencari Kelas').setEmoji('🎩').setStyle(ButtonStyle.Success)
+        );
+
+        await message.channel.send({ embeds: [embed], components: [row] });
+        return;
+    }
+
+    // Blokir command umum jika belum mendapat role asrama
+    if (!isSorted && !isOwner) {
+        if (['!profile', '!leaderboard', '!roster', '!rosterslytherin', '!rostergryffindor', '!rosterravenclaw', '!rosterhufflepuff'].some(cmd => command.startsWith(cmd))) {
+            return message.reply('❌ **Akses Ditolak!** Perintah ini hanya boleh digunakan oleh murid yang sudah memiliki Role Asrama / Kelas (Lewat The Sorting Hat). Silakan hubungi Lord of Magic!');
+        }
+    }
+
+    // B. GENERAL MAGICAL COMMANDS
     if (command === '!profile') {
         const targetUser = message.mentions.users.first() || message.author;
         const targetMember = message.guild.members.cache.get(targetUser.id);
@@ -251,10 +285,9 @@ client.on(Events.MessageCreate, async (message) => {
             pointsContributed = userData.pointsContributed;
         }
         
-        const targetHouse = houses.find(h => targetMember.roles.cache.has(h.id));
+        const targetHouse = HOUSES_DATA.find(h => targetMember.roles.cache.has(h.id));
         const houseName = targetHouse ? `${targetHouse.emoji} ${targetHouse.name}` : 'Belum Masuk Asrama';
 
-        // Persentase Progres Bar Discord Embed Otomatis (Aman dan Presisi)
         const progressPercentage = targetUser.id === OWNER_ID ? 100 : Math.min(Math.floor((userXp / xpNeeded) * 100), 100);
         
         const totalBlocks = 15;
@@ -275,7 +308,7 @@ client.on(Events.MessageCreate, async (message) => {
                 { name: '🏰 Asrama Hogwarts', value: `${houseName}`, inline: true },
                 { name: '⭐ Level Saat Ini', value: `\`${userLevel}\``, inline: true },
                 { name: '🏆 Poin Kontribusi', value: `\`${pointsContributed.toLocaleString()} Poin\``, inline: true },
-                { name: '\u200B', value: '\u200B' }, // Baris Pemisah
+                { name: '\u200B', value: '\u200B' }, 
                 { 
                     name: `📈 Progress Menuju Level Berikutnya (${progressPercentage}%)`, 
                     value: `\`[${visualBar}]\`\n⚡ **${userXp.toLocaleString()} / ${xpNeeded.toLocaleString()} XP**` 
@@ -296,7 +329,7 @@ client.on(Events.MessageCreate, async (message) => {
             .setColor('#25a5cf') 
             .setTitle('🏆 House Cup Tournament - Leaderboard')
             .setDescription('Klasemen asrama Hogwarts saat ini:\n\n' + sortedHouses.map((house, index) => {
-                const houseMeta = houses.find(h => h.name === house[0]);
+                const houseMeta = HOUSES_DATA.find(h => h.name === house[0]);
                 const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '📜';
                 return `${medal} **Rank ${index + 1}**: ${houseMeta.emoji} **${house[0]}** — \`${house[1].toLocaleString()} Poin\``;
             }).join('\n'))
@@ -305,21 +338,39 @@ client.on(Events.MessageCreate, async (message) => {
         return message.channel.send({ embeds: [lbEmbed] });
     }
 
-    if (command === '!sortinghat') {
-        if (userId !== OWNER_ID) {
-            return message.reply('❌ Hanya Lord of Magic yang berhak memanggil The Sorting Hat!');
-        }
+    // FITUR TAMBAHAN: Roster Anggota Asrama (Tanpa Tag/Ping)
+    const targetHouseRoster = HOUSES_DATA.find(h => `!roster${h.command}` === command);
+    if (targetHouseRoster) {
+        await message.guild.members.fetch(); // Memastikan cache member ter-update
 
-        const embed = new EmbedBuilder()
-            .setColor('#25a5cf') 
-            .setTitle('🎩 The Sorting Hat')
-            .setDescription('Welcome to **Hogwarts Academy**\n\nSilahkan tekan tombol di bawah dan biarkan Sorting Hat menentukan kelasmu!');
-
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('sorting_hat').setLabel('Mencari Kelas').setEmoji('🎩').setStyle(ButtonStyle.Success)
+        // Filter member yang memiliki role asrama tersebut
+        const membersInHouse = message.guild.members.cache.filter(member => 
+            member.roles.cache.has(targetHouseRoster.id) && !member.user.bot
         );
 
-        await message.channel.send({ embeds: [embed], components: [row] });
+        let rosterDescription = `📜 **Daftar Penyihir Asrama ${targetHouseRoster.emoji} ${targetHouseRoster.name}**:\n\n`;
+        
+        if (membersInHouse.size === 0) {
+            rosterDescription += '*(Belum ada penyihir yang masuk asrama ini)*';
+        } else {
+            // Cukup munculkan display name dan avatar
+            const listDisplay = membersInHouse.map(member => {
+                const displayName = member.displayName;
+                const avatarURL = member.user.displayAvatarURL({ dynamic: true, size: 32 });
+                return `🖼️ [Avatar](${avatarURL})  |  🪄 **${displayName}**`;
+            }).join('\n');
+            
+            rosterDescription += listDisplay;
+        }
+
+        const rosterEmbed = new EmbedBuilder()
+            .setColor('#25a5cf')
+            .setTitle(`✨ ${targetHouseRoster.emoji} Roster Anggota ${targetHouseRoster.name} ✨`)
+            .setDescription(rosterDescription)
+            .setTimestamp()
+            .setFooter({ text: `Total Anggota: ${membersInHouse.size} Penyihir`, iconURL: client.user.displayAvatarURL() });
+
+        await message.channel.send({ embeds: [rosterEmbed] });
         return;
     }
 
@@ -390,13 +441,13 @@ client.on(Events.InteractionCreate, async interaction => {
     if (interaction.customId !== 'sorting_hat') return;
 
     const member = interaction.member;
-    const alreadySorted = houses.some(house => member.roles.cache.has(house.id));
+    const alreadySorted = HOUSES_DATA.some(house => member.roles.cache.has(house.id));
 
     if (alreadySorted) {
         return interaction.reply({ content: '🎩 You have already been sorted into a House!', ephemeral: true });
     }
 
-    const randomHouse = houses[Math.floor(Math.random() * houses.length)];
+    const randomHouse = HOUSES_DATA[Math.floor(Math.random() * HOUSES_DATA.length)];
     await member.roles.add(randomHouse.id);
 
     await interaction.reply({ content: `🎩 The Sorting Hat has chosen...\n\n${randomHouse.emoji} ${randomHouse.name}!`, ephemeral: true });
