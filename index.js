@@ -124,12 +124,18 @@ client.once(Events.ClientReady, () => {
                         // Cek kelayakan naik level
                         let xpNeeded = getXpNeededForNextLevel(db.users[userId].level);
                         let levelUpOccurred = false;
+                        let reachedLevelCheckpoint = false;
 
                         while (db.users[userId].xp >= xpNeeded) {
                             db.users[userId].xp -= xpNeeded;
                             db.users[userId].level += 1;
                             xpNeeded = getXpNeededForNextLevel(db.users[userId].level);
                             levelUpOccurred = true;
+
+                            // Notifikasi hanya dipicu saat mencapai kelipatan 5 (5, 10, 15, dst)
+                            if (db.users[userId].level % 5 === 0) {
+                                reachedLevelCheckpoint = true;
+                            }
 
                             if (db.users[userId].level >= 1000) {
                                 db.users[userId].level = 1000;
@@ -138,15 +144,16 @@ client.once(Events.ClientReady, () => {
                             }
                         }
 
-                        if (levelUpOccurred) {
+                        // Kirim pesan Level Up hanya jika mencapai kelipatan 5
+                        if (levelUpOccurred && reachedLevelCheckpoint) {
                             const newTitle = getWizardTitle(db.users[userId].level, userId);
                             const levelUpChannel = guild.channels.cache.get(LEVEL_UP_CHANNEL_ID);
                             
                             if (levelUpChannel) {
                                 const levelUpEmbed = new EmbedBuilder()
                                     .setColor('#25a5cf') 
-                                    .setTitle('✨ Hogwarts Academy Level Up!')
-                                    .setDescription(`Selamat! <@${userId}> naik ke **Level ${db.users[userId].level}** lewat kekuatan Voice Channel dan kini bergelar **${newTitle}**! 🎓`)
+                                    .setTitle('✨ Hogwarts Academy Milestone!')
+                                    .setDescription(`Selamat! <@${userId}> telah mencapai **Level ${db.users[userId].level}** dan kini bergelar **${newTitle}**! 🎓 Pencapaian yang luar biasa!`)
                                     .setTimestamp();
 
                                 levelUpChannel.send({ embeds: [levelUpEmbed] }).catch(console.error);
@@ -162,14 +169,10 @@ client.once(Events.ClientReady, () => {
     }, 60000); 
 });
 
-// DETEKSI MEMBER KELUAR SERVER (RESET LEVEL)
+// PENGAMANAN LEPAS GILD: Data tidak akan terhapus jika member keluar
 client.on(Events.GuildMemberRemove, (member) => {
-    let db = getDbData();
-    if (db.users[member.id]) {
-        delete db.users[member.id]; 
-        saveDbData(db);
-        console.log(`🧹 Data level dari ${member.user.username} telah di-reset karena keluar server.`);
-    }
+    // Dimatikan sementara agar database tidak ter-reset otomatis saat testing
+    // console.log(`🧹 Data level dari ${member.user.username} diabaikan.`);
 });
 
 // ==========================================
@@ -197,7 +200,7 @@ client.on(Events.MessageCreate, async (message) => {
         let db = getDbData();
         if (!db.users[targetUser.id]) db.users[targetUser.id] = { xp: 0, level: 1, pointsContributed: 0 };
 
-        db.users[targetUser.id].level = Math.min(newLevel, 1000); // Kunci maks 1000 untuk member biasa
+        db.users[targetUser.id].level = Math.min(newLevel, 1000); 
         db.users[targetUser.id].xp = 0; 
         saveDbData(db);
 
@@ -346,6 +349,7 @@ client.on(Events.MessageCreate, async (message) => {
 
             let xpNeeded = getXpNeededForNextLevel(db.users[userId].level);
             let levelUpOccurred = false;
+            let reachedLevelCheckpoint = false;
 
             // Logika loop naik level kelipatan 5
             while (db.users[userId].xp >= xpNeeded) {
@@ -354,6 +358,10 @@ client.on(Events.MessageCreate, async (message) => {
                 xpNeeded = getXpNeededForNextLevel(db.users[userId].level);
                 levelUpOccurred = true;
 
+                if (db.users[userId].level % 5 === 0) {
+                    reachedLevelCheckpoint = true;
+                }
+
                 if (db.users[userId].level >= 1000) {
                     db.users[userId].level = 1000;
                     db.users[userId].xp = 0;
@@ -361,12 +369,13 @@ client.on(Events.MessageCreate, async (message) => {
                 }
             }
 
-            if (levelUpOccurred) {
+            // Notifikasi level up di-trigger kelipatan 5
+            if (levelUpOccurred && reachedLevelCheckpoint) {
                 const newTitle = getWizardTitle(db.users[userId].level, userId);
                 const levelUpEmbed = new EmbedBuilder()
                     .setColor('#25a5cf') 
-                    .setTitle('✨ Hogwarts Academy Level Up!')
-                    .setDescription(`Selamat! <@${userId}> telah naik ke **Level ${db.users[userId].level}** dan sekarang bergelar **${newTitle}**! 🎓`)
+                    .setTitle('✨ Hogwarts Academy Milestone!')
+                    .setDescription(`Selamat! <@${userId}> telah mencapai **Level ${db.users[userId].level}** dan kini bergelar **${newTitle}**! 🎓 Pencapaian yang luar biasa!`)
                     .setTimestamp();
 
                 await levelUpChannel.send({ embeds: [levelUpEmbed] });
