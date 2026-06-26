@@ -97,6 +97,8 @@ client.on(Events.MessageCreate, async (message) => {
     const args = message.content.split(' ');
     const command = args[0].toLowerCase();
 
+    const levelUpChannel = message.guild.channels.cache.get(LEVEL_UP_CHANNEL_ID) || message.channel;
+
     // ==========================================
     // A. COMMAND KHUSUS OWNER (ADMIN COMMANDS)
     // ==========================================
@@ -127,6 +129,17 @@ client.on(Events.MessageCreate, async (message) => {
         db[targetUser.id].level = newLevel;
         db[targetUser.id].xp = 0; 
         saveUserData(db);
+
+        // Kirim notifikasi embed ke channel level up khusus
+        const newTitle = getWizardTitle(newLevel, targetUser.id);
+        const adminSetEmbed = new EmbedBuilder()
+            .setColor('#25a5cf')
+            .setTitle('✨ Hogwarts Power Awakening!')
+            .setDescription(`Kekuatan sihir <@${targetUser.id}> telah disesuaikan oleh Lord! Berada di **Level ${newLevel}** dengan gelar **${newTitle}**! 🎓`)
+            .setImage(HOGWARTS_GIF)
+            .setTimestamp();
+
+        await levelUpChannel.send({ embeds: [adminSetEmbed] });
 
         return message.reply(`✅ Berhasil mengubah tingkat sihir ${targetUser} menjadi **Level ${newLevel}**!`);
     }
@@ -159,6 +172,17 @@ client.on(Events.MessageCreate, async (message) => {
         db[targetUser.id].level = finalLevel;
         saveUserData(db);
 
+        // Kirim notifikasi embed ke channel level up khusus
+        const newTitle = getWizardTitle(finalLevel, targetUser.id);
+        const adminAddEmbed = new EmbedBuilder()
+            .setColor('#25a5cf')
+            .setTitle('✨ Hogwarts Academy Level Up!')
+            .setDescription(`Selamat! <@${targetUser.id}> mendapatkan berkah tingkat sihir tambahan dan naik ke **Level ${finalLevel}** bergelar **${newTitle}**! 🎓`)
+            .setImage(HOGWARTS_GIF)
+            .setTimestamp();
+
+        await levelUpChannel.send({ embeds: [adminAddEmbed] });
+
         return message.reply(`✅ Berhasil menambahkan +${levelToAdd} level ke ${targetUser}. Sekarang berada di **Level ${finalLevel}**!`);
     }
 
@@ -167,8 +191,6 @@ client.on(Events.MessageCreate, async (message) => {
     // ==========================================
 
     if (command === '!levelup') {
-        const targetChannel = message.guild.channels.cache.get(LEVEL_UP_CHANNEL_ID) || message.channel;
-
         const testEmbed = new EmbedBuilder()
             .setColor('#25a5cf')
             .setTitle('✨ Hogwarts Academy Level Up!')
@@ -176,8 +198,8 @@ client.on(Events.MessageCreate, async (message) => {
             .setImage(HOGWARTS_GIF)
             .setTimestamp();
 
-        await targetChannel.send({ embeds: [testEmbed] });
-        if (targetChannel.id !== message.channel.id) {
+        await levelUpChannel.send({ embeds: [testEmbed] });
+        if (levelUpChannel.id !== message.channel.id) {
             message.reply('✅ Pesan simulasi level-up telah dikirim ke channel khusus!');
         }
         return; 
@@ -210,11 +232,10 @@ client.on(Events.MessageCreate, async (message) => {
     // ==========================================
     if (!xpCooldowns.has(userId)) {
         try {
-            // Cek apakah member punya salah satu dari 4 role asrama Hogwarts (Bypass jika dia Owner)
             const hasHouseRole = message.member.roles.cache.some(role => houses.some(house => house.id === role.id));
             
             if (!hasHouseRole && userId !== OWNER_ID) {
-                return; // 🔒 MUGGLE LOCK: Abaikan chat jika belum pilih asrama
+                return; 
             }
 
             let db = getUserData();
@@ -236,7 +257,6 @@ client.on(Events.MessageCreate, async (message) => {
                 db[userId].level += 1; 
 
                 const newTitle = getWizardTitle(db[userId].level, userId);
-                const levelUpChannel = message.guild.channels.cache.get(LEVEL_UP_CHANNEL_ID) || message.channel;
 
                 const levelUpEmbed = new EmbedBuilder()
                     .setColor('#25a5cf')
