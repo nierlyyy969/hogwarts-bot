@@ -261,9 +261,15 @@ client.on(Events.MessageCreate, async (message) => {
 
     // B. GENERAL MAGICAL COMMANDS
     if (command === '!profile') {
+        // AMAN: Memastikan guild menghandel cache member secara penuh
+        await message.guild.members.fetch();
         const targetUser = message.mentions.users.first() || message.author;
         const targetMember = message.guild.members.cache.get(targetUser.id);
         
+        if (!targetMember) {
+            return message.reply('❌ Terjadi kesalahan: Penyihir tidak ditemukan di dalam server ini.');
+        }
+
         let userLevel, userXp, xpNeeded, wizardTitle;
         let pointsContributed = 0; 
 
@@ -447,6 +453,10 @@ client.on(Events.InteractionCreate, async interaction => {
 
     await interaction.reply({ content: `🎩 The Sorting Hat has chosen...\n\n${randomHouse.emoji} ${randomHouse.name}!`, ephemeral: true });
 });
+
+function housePointsCacheUpdate(houseName, points) {
+    housePointsCache[houseName] = (housePointsCache[houseName] || 0) + points;
+}
 
 function houseCacheUpdate(houseName, points) {
     housePointsCache[houseName] = (housePointsCache[houseName] || 0) + points;
