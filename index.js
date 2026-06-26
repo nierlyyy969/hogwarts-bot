@@ -263,27 +263,27 @@ client.on(Events.MessageCreate, async (message) => {
         const targetHouse = houses.find(h => targetMember.roles.cache.has(h.id));
         const houseName = targetHouse ? `${targetHouse.emoji} ${targetHouse.name}` : 'Belum Masuk Asrama';
 
-        // Kotak diperkecil (lebar total hanya 30 karakter) agar sangat pas dan tidak melebar di layar HP
-        const totalBars = 10;
+        // Mengembalikan ukuran bar progres megah (32 kotak)
+        const totalBars = 32;
         const percentage = xpNeeded > 0 ? Math.min(userXp / xpNeeded, 1) : 1;
         const filledBars = Math.round(percentage * totalBars);
         const emptyBars = totalBars - filledBars;
-        const progressBarText = '▓'.repeat(filledBars) + '░'.repeat(emptyBars);
+        const progressBarText = '█'.repeat(filledBars) + '░'.repeat(emptyBars);
 
         const profileDisplay = 
-`┌──────────────────────────────┐
-       ✨ WIZARD PROFILE ✨     
-├──────────────────────────────┤
-  🧙‍♂️ Nama   :  ${targetUser.username}
-  🏷️ Gelar   :  ${wizardTitle}
-  🏰 Asrama :  ${houseName}
-  ⭐ Level  :  ${userLevel}
-  🏆 Poin   :  ${pointsContributed.toLocaleString()}
-├──────────────────────────────┤
+`╔══════════════════════════════════════════╗
+║              ✨ WIZARD PROFILE ✨        ║
+╠══════════════════════════════════════════╣
+  🧙‍♂️ Nama         :  ${targetUser.username}
+  🏷️ Gelar         :  ${wizardTitle}
+  🏰 Asrama       :  ${houseName}
+  ⭐ Level        :  ${userLevel}
+  🏆 Poin Asrama  :  ${pointsContributed.toLocaleString()} Poin
+╠══════════════════════════════════════════╣
   📈 PROGRES NAIK LEVEL:
   [${progressBarText}]
   ⚡ ${userXp.toLocaleString()} / ${xpNeeded.toLocaleString()} XP
-└──────────────────────────────┘`;
+╚══════════════════════════════════════════╝`;
 
         await message.channel.send(`\`\`\`text\n${profileDisplay}\n\`\`\``);
         return;
