@@ -80,10 +80,8 @@ const xpCooldowns = new Set();
 // ==========================================
 // KONEKSI DATABASE & BOT READY
 // ==========================================
-mongoose.connect(process.env.MONGO_URL || process.env.MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-}).then(() => {
+mongoose.connect(process.env.MONGO_URL || process.env.MONGODB_URI)
+.then(() => {
     console.log('🔗 Connected to MongoDB Database successfully!');
     client.login(process.env.DISCORD_TOKEN);
 }).catch(err => {
@@ -261,7 +259,6 @@ client.on(Events.MessageCreate, async (message) => {
 
     // B. GENERAL MAGICAL COMMANDS
     if (command === '!profile') {
-        // AMAN: Memastikan guild menghandel cache member secara penuh
         await message.guild.members.fetch();
         const targetUser = message.mentions.users.first() || message.author;
         const targetMember = message.guild.members.cache.get(targetUser.id);
