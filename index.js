@@ -11,7 +11,7 @@ const {
     EmbedBuilder
 } = require('discord.js');
 
-// Mengambil model User yang sudah kamu buat di folder /models
+// Mengambil model User yang ada di folder /models
 const User = require('./models/User'); 
 
 const client = new Client({
@@ -265,7 +265,7 @@ client.on(Events.MessageCreate, async (message) => {
         const targetMember = message.guild.members.cache.get(targetUser.id);
         
         let userLevel, userXp, xpNeeded, wizardTitle;
-        let pointsContributed = 0; // Karena di skrip awal poin kontribusi terpusat ke Users
+        let pointsContributed = 0; 
 
         if (targetUser.id === OWNER_ID) {
             userLevel = 9999;
@@ -444,3 +444,5 @@ client.on(Events.InteractionCreate, async interaction => {
 
     await interaction.reply({ content: `🎩 The Sorting Hat has chosen...\n\n${randomHouse.emoji} ${randomHouse.name}!`, ephemeral: true });
 });
+
+client.login(process.env.DISCORD_TOKEN);
