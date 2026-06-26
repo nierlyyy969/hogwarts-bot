@@ -29,11 +29,12 @@ const client = new Client({
 const OWNER_ID = '1180180812327559310'; 
 const LEVEL_UP_CHANNEL_ID = '1475801714425860272'; 
 
+// Direct link logo asrama untuk dimasukkan ke canvas kotak hijau
 const houses = [
-    { id: '1475605712938864796', name: 'Gryffindor', emoji: '🦁', color: '#740001', accent: '#e3a00e' },
-    { id: '1475786100210401413', name: 'Slytherin', emoji: '🐍', color: '#1a472a', accent: '#aaaaaa' },
-    { id: '1475786808167235604', name: 'Ravenclaw', emoji: '🦅', color: '#0e1a40', accent: '#946b2d' },
-    { id: '1475787032759631965', name: 'Hufflepuff', emoji: '🦡', color: '#ffcc00', accent: '#000000' }
+    { id: '1475605712938864796', name: 'Gryffindor', emoji: '🦁', color: '#740001', accent: '#e3a00e', logo: 'https://i.imgur.com/1go5VXj.png' },
+    { id: '1475786100210401413', name: 'Slytherin', emoji: '🐍', color: '#1a472a', accent: '#aaaaaa', logo: 'https://i.imgur.com/gPLI7Fo.png' },
+    { id: '1475786808167235604', name: 'Ravenclaw', emoji: '🦅', color: '#0e1a40', accent: '#946b2d', logo: 'https://i.imgur.com/SiyKVTW.png' },
+    { id: '1475787032759631965', name: 'Hufflepuff', emoji: '🦡', color: '#ffcc00', accent: '#000000', logo: 'https://i.imgur.com/7PyCEAA.png' }
 ];
 
 const dataPath = path.join(__dirname, 'users.json');
@@ -130,17 +131,22 @@ async function generateProfileCard(userData, user, guildMember) {
     ctx.textAlign = 'center';
     ctx.fillText('HOGWARTS ACADEMY', 600, 93);
 
-    // Subtitle Wizard Profile
-    ctx.fillStyle = '#4a3b32';
-    ctx.font = 'italic 24px Georgia, serif';
-    ctx.fillText(`WIZARD PROFILE • ${user.username.toUpperCase()}`, 600, 150);
+    // Pita / Kotak Panjang Atas (WIZARD PROFILE)
+    ctx.fillStyle = '#d4cbb8';
+    ctx.fillRect(400, 140, 400, 45);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#635446';
+    ctx.strokeRect(400, 140, 400, 45);
+
+    ctx.fillStyle = '#2c221e';
+    ctx.font = 'bold 26px Georgia, serif';
+    ctx.fillText('WIZARD PROFILE', 600, 170);
 
     // 4. Bingkai Avatar (Kiri) & Plakat Nama
-    // Bingkai Avatar
     ctx.lineWidth = 8;
     ctx.strokeStyle = houseAccent;
     ctx.beginPath();
-    ctx.arc(200, 350, 120, 0, Math.PI * 2);
+    ctx.arc(200, 320, 120, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff';
     ctx.fill();
     ctx.stroke();
@@ -150,108 +156,94 @@ async function generateProfileCard(userData, user, guildMember) {
         const avatar = await loadImage(user.displayAvatarURL({ extension: 'png', size: 512 }));
         ctx.save();
         ctx.beginPath();
-        ctx.arc(200, 350, 112, 0, Math.PI * 2);
+        ctx.arc(200, 320, 112, 0, Math.PI * 2);
         ctx.clip();
-        ctx.drawImage(avatar, 88, 238, 224, 224);
+        ctx.drawImage(avatar, 88, 208, 224, 224);
         ctx.restore();
     } catch (e) {
         console.error('Gagal memuat avatar:', e);
     }
 
-    // Plakat Nama di bawah Avatar
+    // Plakat Nama User di bawah Avatar (Sesuai request)
     ctx.fillStyle = '#3a2e2b';
-    ctx.fillRect(75, 485, 250, 50);
+    ctx.fillRect(75, 465, 250, 50);
     ctx.strokeStyle = '#8c7853';
-    ctx.strokeRect(75, 485, 250, 50);
+    ctx.strokeRect(75, 465, 250, 50);
 
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 24px Georgia, serif';
     ctx.textAlign = 'center';
-    ctx.fillText(user.username, 200, 520);
+    ctx.fillText(user.username, 200, 500);
 
-    // 5. Plakat Asrama (Tengah)
+    // 5. Plakat Asrama / Kotak Warna Hijau (Tengah)
+    // Latar belakang kotak menggunakan warna dasar asrama
     ctx.fillStyle = houseColor;
-    ctx.fillRect(425, 200, 350, 300);
+    ctx.fillRect(425, 220, 350, 260);
     ctx.lineWidth = 6;
     ctx.strokeStyle = houseAccent;
-    ctx.strokeRect(425, 200, 350, 300);
+    ctx.strokeRect(425, 220, 350, 260);
 
-    // Simbol Emoji Asrama Raksasa di Plakat Tengah
-    if (houseObj) {
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '120px sans-serif'; // Emoji dirender via font sistem
-        ctx.textAlign = 'center';
-        ctx.fillText(houseObj.emoji, 600, 360);
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 32px Georgia, serif';
-        ctx.fillText(houseObj.name.toUpperCase(), 600, 430);
-        
-        ctx.font = 'italic 20px Georgia, serif';
-        ctx.fillStyle = houseAccent;
-        ctx.fillText('Hogwarts House', 600, 465);
-    } else {
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '36px Georgia, serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('🥚 MUGGLE', 600, 350);
-        ctx.font = '20px Georgia, serif';
-        ctx.fillStyle = '#b0a692';
-        ctx.fillText('(Belum di-Sorting Hat)', 600, 390);
+    // Memuat gambar logo asrama ke tengah kotak warna tersebut
+    if (houseObj && houseObj.logo) {
+        try {
+            const houseLogo = await loadImage(houseObj.logo);
+            // Gambar logo dengan ukuran proporsional di dalam kotak
+            ctx.drawImage(houseLogo, 495, 245, 210, 210);
+        } catch (e) {
+            console.error('Gagal memuat logo asrama:', e);
+        }
     }
 
     // 6. Plakat Status Level & Gelar (Kanan)
     ctx.fillStyle = '#3a2e2b';
-    ctx.fillRect(825, 200, 325, 300);
+    ctx.fillRect(825, 220, 325, 260);
     ctx.lineWidth = 6;
     ctx.strokeStyle = '#8c7853';
-    ctx.strokeRect(825, 200, 325, 300);
+    ctx.strokeRect(825, 220, 325, 260);
 
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 48px Georgia, serif';
     ctx.textAlign = 'center';
-    ctx.fillText(`LEVEL ${userData.level}`, 987, 280);
+    ctx.fillText(`LEVEL ${userData.level}`, 987, 295);
 
     const title = getWizardTitle(userData.level, user.id);
     ctx.font = 'bold italic 24px Georgia, serif';
     ctx.fillStyle = user.id === OWNER_ID ? '#ffd700' : houseAccent;
-    ctx.fillText(title, 987, 340);
+    ctx.fillText(title, 987, 355);
 
-    // Sub-plakat House Cup Contribution (Kanan Bawah Kotak Level)
+    // Sub-plakat House Cup Contribution
     ctx.fillStyle = 'rgba(0,0,0,0.2)';
-    ctx.fillRect(850, 385, 275, 90);
+    ctx.fillRect(850, 395, 275, 65);
     ctx.strokeStyle = '#5c4a43';
-    ctx.strokeRect(850, 385, 275, 90);
+    ctx.strokeRect(850, 395, 275, 65);
 
     ctx.fillStyle = '#b0a692';
-    ctx.font = '20px Georgia, serif';
-    ctx.fillText('🏆 HOUSE CUP CONTRIBUTION', 987, 415);
+    ctx.font = '16px Georgia, serif';
+    ctx.fillText('🏆 HOUSE CUP CONTRIBUTION', 987, 420);
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 28px Georgia, serif';
-    ctx.fillText(`${userData.pointsContributed.toLocaleString()} POINTS`, 987, 455);
+    ctx.font = 'bold 24px Georgia, serif';
+    ctx.fillText(`${userData.pointsContributed.toLocaleString()} POINTS`, 987, 448);
 
     // 7. Progress Bar XP (Kiri Bawah)
     const xpNeeded = getXpNeededForNextLevel(userData.level);
     const xpPercentage = Math.min(userData.xp / xpNeeded, 1);
 
-    // Label Progress Bar
     ctx.textAlign = 'left';
     ctx.fillStyle = '#4a3b32';
     ctx.font = 'bold 22px Georgia, serif';
     ctx.fillText('🪄 MAGIC KNOWLEDGE PROGRESS (XP)', 75, 575);
 
-    // Wadah Bar (Abu-abu Antik)
+    // Wadah Bar
     ctx.fillStyle = '#d1c5a9';
     ctx.fillRect(75, 600, 690, 45);
     ctx.strokeStyle = '#635446';
     ctx.lineWidth = 3;
     ctx.strokeRect(75, 600, 690, 45);
 
-    // Isi Bar (Warna Sesuai Asrama)
+    // Isi Bar
     ctx.fillStyle = houseColor;
     ctx.fillRect(78, 603, 684 * xpPercentage, 39);
 
-    // Teks Angka XP di dalam bar
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 24px sans-serif';
     ctx.textAlign = 'center';
@@ -279,7 +271,7 @@ client.on(Events.MessageCreate, async (message) => {
     const levelUpChannel = message.guild.channels.cache.get(LEVEL_UP_CHANNEL_ID) || message.channel;
     const userHouseObj = houses.find(h => message.member.roles.cache.has(h.id));
 
-    // A. ADMIN COMMANDS
+    // A. ADMIN COMMANDS (Khusus Owner Server / Lord)
     if (command === '!setlevel') {
         if (userId !== OWNER_ID) return message.reply('❌ Hanya Lord yang berhak memanipulasi tingkat sihir!');
         const targetUser = message.mentions.users.first();
@@ -320,7 +312,23 @@ client.on(Events.MessageCreate, async (message) => {
         return message.reply(`🏆 **+${points.toLocaleString()} Poin** telah dianugerahkan ke asrama **${targetHouse.emoji} ${targetHouse.name}** berkat prestasi ${targetMember}!`);
     }
 
-    // B. GENERAL MAGICAL COMMANDS
+    // Perintah !levelup dikunci khusus Owner/Lord Server
+    if (command === '!levelup') {
+        if (userId !== OWNER_ID) return message.reply('❌ Perintah ini khusus untuk Lord of Magic!');
+        const testEmbed = new EmbedBuilder()
+            .setColor('#25a5cf')
+            .setTitle('✨ Hogwarts Academy Level Up!')
+            .setDescription(`Selamat! ${message.author} telah naik level! 🎓`)
+            .setTimestamp();
+
+        await levelUpChannel.send({ embeds: [testEmbed] });
+        if (levelUpChannel.id !== message.channel.id) {
+            message.reply('✅ Pesan simulasi level-up telah dikirim ke channel khusus!');
+        }
+        return; 
+    }
+
+    // B. GENERAL MAGICAL COMMANDS (Bisa digunakan semua member)
     if (command === '!profile') {
         const loadingMessage = await message.reply('✨ Meracik lembar profil magis dari arsip Hogwarts...');
 
@@ -332,7 +340,8 @@ client.on(Events.MessageCreate, async (message) => {
         
         try {
             const profileAttachment = await generateProfileCard(userData, targetUser, targetMember);
-            await message.channel.send({ content: `Penyihir ${targetUser}, inilah lembar arsip sihirmu:`, files: [profileAttachment] });
+            // Menambahkan keterangan siapa yang memanggil command (!profile)
+            await message.channel.send({ content: `Penyihir ${message.author}, inilah lembar arsip sihir dari profil **${targetUser.username}**:`, files: [profileAttachment] });
             loadingMessage.delete();
         } catch (error) {
             console.error('Gagal meracik kanvas profil:', error);
@@ -378,7 +387,7 @@ client.on(Events.MessageCreate, async (message) => {
     // C. AUTOMATIC XP & LEVELING SYSTEM
     if (!xpCooldowns.has(userId)) {
         try {
-            if (!userObj && userId !== OWNER_ID) return; 
+            if (!userHouseObj && userId !== OWNER_ID) return; 
 
             let db = getDbData();
             if (!db.users[userId]) {
@@ -391,8 +400,8 @@ client.on(Events.MessageCreate, async (message) => {
             const xpGained = Math.floor(Math.random() * 11) + 15;
             db.users[userId].xp += xpGained;
 
-            if (userObj) {
-                db.housePoints[userObj.name] += 1;
+            if (userHouseObj) {
+                db.housePoints[userHouseObj.name] += 1;
                 db.users[userId].pointsContributed += 1;
             }
 
