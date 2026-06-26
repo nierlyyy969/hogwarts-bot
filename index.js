@@ -29,7 +29,6 @@ const client = new Client({
 const OWNER_ID = '1180180812327559310'; 
 const LEVEL_UP_CHANNEL_ID = '1475801714425860272'; 
 
-// Direct link logo asrama untuk dimasukkan ke canvas kotak hijau
 const houses = [
     { id: '1475605712938864796', name: 'Gryffindor', emoji: '🦁', color: '#740001', accent: '#e3a00e', logo: 'https://i.imgur.com/1go5VXj.png' },
     { id: '1475786100210401413', name: 'Slytherin', emoji: '🐍', color: '#1a472a', accent: '#aaaaaa', logo: 'https://i.imgur.com/gPLI7Fo.png' },
@@ -58,28 +57,28 @@ function getXpNeededForNextLevel(level) {
 }
 
 function getWizardTitle(level, userId) {
-    if (userId === OWNER_ID) return '👑 Lord of Magic';
-    if (level >= 900) return '🧙‍♂️ Ancient Archmage';
-    if (level >= 800) return '🏛️ Grand Sorcerer';
-    if (level >= 700) return '📜 Chief Warlock';
-    if (level >= 600) return '🛡️ Order of the Merlin';
-    if (level >= 500) return '🏰 Auror Commander';
-    if (level >= 400) return '🦅 Undersecretary';
-    if (level >= 300) return '🦁 Department Head';
-    if (level >= 200) return '🧹 Elite Auror';
-    if (level >= 150) return '🧪 Master Alchemist';
-    if (level >= 100) return '🔮 Ministry Official';
-    if (level >= 75)  return '🌟 Head Boy / Head Girl';
-    if (level >= 50)  return '🦡 Prefect';
-    if (level >= 40)  return '🎓 Hogwarts Graduate';
-    if (level >= 35)  return '🧹 Seventh Year';
-    if (level >= 30)  return '📚 Sixth Year';
-    if (level >= 25)  return '🧪 Fifth Year (O.W.L.)';
-    if (level >= 20)  return '🛡️ Fourth Year';
-    if (level >= 15)  return '🦅 Third Year';
-    if (level >= 10)  return '📜 Second Year';
-    if (level >= 5)   return '🌱 First Year';
-    return '🌱 New Student';
+    if (userId === OWNER_ID) return 'Lord of magic';
+    if (level >= 900) return 'Ancient Archmage';
+    if (level >= 800) return 'Grand Sorcerer';
+    if (level >= 700) return 'Chief Warlock';
+    if (level >= 600) return 'Order of the Merlin';
+    if (level >= 500) return 'Auror Commander';
+    if (level >= 400) return 'Undersecretary';
+    if (level >= 300) return 'Department Head';
+    if (level >= 200) return 'Elite Auror';
+    if (level >= 150) return 'Master Alchemist';
+    if (level >= 100) return 'Ministry Official';
+    if (level >= 75)  return 'Head Boy / Head Girl';
+    if (level >= 50)  return 'Prefect';
+    if (level >= 40)  return 'Hogwarts Graduate';
+    if (level >= 35)  return 'Seventh Year';
+    if (level >= 30)  return 'Sixth Year';
+    if (level >= 25)  return 'Fifth Year (O.W.L.)';
+    if (level >= 20)  return 'Fourth Year';
+    if (level >= 15)  return 'Third Year';
+    if (level >= 10)  return 'Second Year';
+    if (level >= 5)   return 'First Year';
+    return 'New Student';
 }
 
 const xpCooldowns = new Set();
@@ -91,175 +90,140 @@ client.once(Events.ClientReady, () => {
 // ==========================================
 // 🪄 CANVAS MURNI: GENERATOR KARTU PROFIL
 // ==========================================
-async function generateProfileCard(userData, user, guildMember) {
-    const canvas = createCanvas(1200, 750);
+async function generateProfileCard(userData, user, guildMember, triggerUser) {
+    // Ukuran kanvas proporsional (mengikuti referensi)
+    const canvas = createCanvas(1000, 600);
     const ctx = canvas.getContext('2d');
 
     const houseObj = houses.find(h => guildMember.roles.cache.has(h.id));
-    const houseColor = houseObj ? houseObj.color : '#2c221e';
-    const houseAccent = houseObj ? houseObj.accent : '#d4af37';
+    const houseColor = houseObj ? houseObj.color : '#2e2e2e';
+    const houseName = houseObj ? houseObj.name : 'MUGGLE';
 
-    // 1. Latar Belakang Perkamen Antik
-    ctx.fillStyle = '#f6ebcf';
+    // 1. Latar Belakang Krem Klasik / Kulit Kuno
+    ctx.fillStyle = '#f2eade';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Efek serat kertas / tekstur klasik
-    ctx.fillStyle = 'rgba(100, 70, 30, 0.03)';
-    for (let i = 0; i < 500; i++) {
-        ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, Math.random() * 3 + 1, Math.random() * 100 + 20);
-    }
-
-    // 2. Bingkai Utama / Border Klasik
-    ctx.lineWidth = 16;
+    // 2. Bingkai / Border Luar
+    ctx.lineWidth = 10;
     ctx.strokeStyle = '#4a3b32';
     ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
 
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = houseAccent;
-    ctx.strokeRect(32, 32, canvas.width - 64, canvas.height - 64);
-
-    // 3. Plakat Header "HOGWARTS ACADEMY"
-    ctx.fillStyle = '#2c221e';
-    ctx.fillRect(250, 45, 700, 75);
-    
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = houseAccent;
-    ctx.strokeRect(250, 45, 700, 75);
-
-    ctx.fillStyle = '#d4af37';
-    ctx.font = 'bold 36px Georgia, serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('HOGWARTS ACADEMY', 600, 93);
-
-    // Pita / Kotak Panjang Atas (WIZARD PROFILE)
-    ctx.fillStyle = '#d4cbb8';
-    ctx.fillRect(400, 140, 400, 45);
     ctx.lineWidth = 2;
-    ctx.strokeStyle = '#635446';
-    ctx.strokeRect(400, 140, 400, 45);
+    ctx.strokeStyle = '#8c7853';
+    ctx.strokeRect(26, 26, canvas.width - 52, canvas.height - 52);
 
-    ctx.fillStyle = '#2c221e';
-    ctx.font = 'bold 26px Georgia, serif';
-    ctx.fillText('WIZARD PROFILE', 600, 170);
+    // 3. Header "PROFILE WIZARD" (Pita Hitam Atas)
+    ctx.fillStyle = '#211c18'; // Pita hitam
+    ctx.fillRect(160, 45, 680, 45);
+    ctx.strokeStyle = '#4a3b32';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(160, 45, 680, 45);
 
-    // 4. Bingkai Avatar (Kiri) & Plakat Nama
-    ctx.lineWidth = 8;
-    ctx.strokeStyle = houseAccent;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 26px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('PROFILE WIZARD', 500, 75);
+
+    // Subheader Kotak Asrama (Tepat di bawah pita header)
+    ctx.fillStyle = '#d4cbb8'; // Kotak abu/krem
+    ctx.fillRect(360, 100, 280, 30);
+    ctx.strokeStyle = '#8c7853';
+    ctx.strokeRect(360, 100, 280, 30);
+
+    ctx.fillStyle = '#211c18';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.fillText(houseName, 500, 121);
+
+    // 4. Avatar (Kiri) & Label usn discord di bawahnya
+    // Lingkaran Avatar
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#4a3b32';
     ctx.beginPath();
-    ctx.arc(200, 320, 120, 0, Math.PI * 2);
+    ctx.arc(160, 260, 70, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff';
     ctx.fill();
     ctx.stroke();
 
-    // Gambar Avatar Melingkar
     try {
-        const avatar = await loadImage(user.displayAvatarURL({ extension: 'png', size: 512 }));
+        const avatar = await loadImage(user.displayAvatarURL({ extension: 'png', size: 256 }));
         ctx.save();
         ctx.beginPath();
-        ctx.arc(200, 320, 112, 0, Math.PI * 2);
+        ctx.arc(160, 260, 66, 0, Math.PI * 2);
         ctx.clip();
-        ctx.drawImage(avatar, 88, 208, 224, 224);
+        ctx.drawImage(avatar, 94, 194, 132, 132);
         ctx.restore();
     } catch (e) {
         console.error('Gagal memuat avatar:', e);
     }
 
-    // Plakat Nama User di bawah Avatar (Sesuai request)
-    ctx.fillStyle = '#3a2e2b';
-    ctx.fillRect(75, 465, 250, 50);
-    ctx.strokeStyle = '#8c7853';
-    ctx.strokeRect(75, 465, 250, 50);
+    // Kotak Label usn discord (di bawah avatar)
+    ctx.fillStyle = '#4a3b32';
+    ctx.fillRect(75, 345, 170, 30);
+    ctx.strokeStyle = '#211c18';
+    ctx.strokeRect(75, 345, 170, 30);
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 24px Georgia, serif';
+    ctx.font = 'bold 14px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(user.username, 200, 500);
+    ctx.fillText(triggerUser.username, 160, 365);
 
-    // 5. Plakat Asrama / Kotak Warna Hijau (Tengah)
-    // Latar belakang kotak menggunakan warna dasar asrama
+    // 5. Kotak Logo Asrama (Tengah - Warna Hijau/Sesuai Asrama)
     ctx.fillStyle = houseColor;
-    ctx.fillRect(425, 220, 350, 260);
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = houseAccent;
-    ctx.strokeRect(425, 220, 350, 260);
+    ctx.fillRect(310, 160, 380, 180);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#4a3b32';
+    ctx.strokeRect(310, 160, 380, 180);
 
-    // Memuat gambar logo asrama ke tengah kotak warna tersebut
+    // Memuat logo asrama di dalam kotak tengah
     if (houseObj && houseObj.logo) {
         try {
             const houseLogo = await loadImage(houseObj.logo);
-            // Gambar logo dengan ukuran proporsional di dalam kotak
-            ctx.drawImage(houseLogo, 495, 245, 210, 210);
+            // Gambar logo dengan ukuran proporsional di tengah kotak
+            ctx.drawImage(houseLogo, 395, 175, 210, 210);
         } catch (e) {
             console.error('Gagal memuat logo asrama:', e);
         }
     }
 
-    // 6. Plakat Status Level & Gelar (Kanan)
-    ctx.fillStyle = '#3a2e2b';
-    ctx.fillRect(825, 220, 325, 260);
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = '#8c7853';
-    ctx.strokeRect(825, 220, 325, 260);
+    // 6. Kotak Gelar / Title (Kanan)
+    ctx.fillStyle = '#362d26'; // Kotak coklat tua
+    ctx.fillRect(730, 160, 200, 180);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#4a3b32';
+    ctx.strokeRect(730, 160, 200, 180);
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 48px Georgia, serif';
+    // Label (gelar) di dalam kotak kanan
+    ctx.fillStyle = '#c2b193';
+    ctx.font = '12px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(`LEVEL ${userData.level}`, 987, 295);
+    ctx.fillText('(gelar)', 830, 200);
 
     const title = getWizardTitle(userData.level, user.id);
-    ctx.font = 'bold italic 24px Georgia, serif';
-    ctx.fillStyle = user.id === OWNER_ID ? '#ffd700' : houseAccent;
-    ctx.fillText(title, 987, 355);
-
-    // Sub-plakat House Cup Contribution
-    ctx.fillStyle = 'rgba(0,0,0,0.2)';
-    ctx.fillRect(850, 395, 275, 65);
-    ctx.strokeStyle = '#5c4a43';
-    ctx.strokeRect(850, 395, 275, 65);
-
-    ctx.fillStyle = '#b0a692';
-    ctx.font = '16px Georgia, serif';
-    ctx.fillText('🏆 HOUSE CUP CONTRIBUTION', 987, 420);
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 24px Georgia, serif';
-    ctx.fillText(`${userData.pointsContributed.toLocaleString()} POINTS`, 987, 448);
+    ctx.font = 'bold 20px sans-serif';
+    ctx.fillText(title, 830, 240);
 
-    // 7. Progress Bar XP (Kiri Bawah)
+    // 7. Pita Panjang Bawah (Level & Progress XP)
     const xpNeeded = getXpNeededForNextLevel(userData.level);
-    const xpPercentage = Math.min(userData.xp / xpNeeded, 1);
+    const displayLevelText = `[lvl. ${userData.level} ${userData.xp}/${xpNeeded}]`;
 
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#4a3b32';
-    ctx.font = 'bold 22px Georgia, serif';
-    ctx.fillText('🪄 MAGIC KNOWLEDGE PROGRESS (XP)', 75, 575);
-
-    // Wadah Bar
-    ctx.fillStyle = '#d1c5a9';
-    ctx.fillRect(75, 600, 690, 45);
-    ctx.strokeStyle = '#635446';
+    ctx.fillStyle = '#d4cbb8'; // Pita bawah
+    ctx.fillRect(75, 430, 850, 60);
+    ctx.strokeStyle = '#4a3b32';
     ctx.lineWidth = 3;
-    ctx.strokeRect(75, 600, 690, 45);
+    ctx.strokeRect(75, 430, 850, 60);
 
-    // Isi Bar
-    ctx.fillStyle = houseColor;
-    ctx.fillRect(78, 603, 684 * xpPercentage, 39);
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 24px sans-serif';
+    // Teks Level & XP di dalam pita bawah
+    ctx.fillStyle = '#211c18';
+    ctx.font = 'bold 28px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(`${userData.xp.toLocaleString()} / ${xpNeeded.toLocaleString()} XP`, 420, 630);
-
-    // 8. Footer Ledger
-    ctx.fillStyle = '#4a3b32';
-    ctx.font = '16px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('HOGWARTS ACADEMY STUDENT LEDGER • WIZARDING WORLD OFFICIAL', 600, 715);
+    ctx.fillText(displayLevelText, 500, 472);
 
     return new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'profile.png' });
 }
 
 // ==========================================
-// EVENT HANDLER CHAT (Sistem Leveling & Command)
+// EVENT HANDLER CHAT
 // ==========================================
 client.on(Events.MessageCreate, async (message) => {
     if (message.author.bot || !message.guild) return;
@@ -271,7 +235,7 @@ client.on(Events.MessageCreate, async (message) => {
     const levelUpChannel = message.guild.channels.cache.get(LEVEL_UP_CHANNEL_ID) || message.channel;
     const userHouseObj = houses.find(h => message.member.roles.cache.has(h.id));
 
-    // A. ADMIN COMMANDS (Khusus Owner Server / Lord)
+    // A. ADMIN COMMANDS (Hanya Lord/Owner Server)
     if (command === '!setlevel') {
         if (userId !== OWNER_ID) return message.reply('❌ Hanya Lord yang berhak memanipulasi tingkat sihir!');
         const targetUser = message.mentions.users.first();
@@ -312,7 +276,7 @@ client.on(Events.MessageCreate, async (message) => {
         return message.reply(`🏆 **+${points.toLocaleString()} Poin** telah dianugerahkan ke asrama **${targetHouse.emoji} ${targetHouse.name}** berkat prestasi ${targetMember}!`);
     }
 
-    // Perintah !levelup dikunci khusus Owner/Lord Server
+    // Khusus Owner/Lord Server
     if (command === '!levelup') {
         if (userId !== OWNER_ID) return message.reply('❌ Perintah ini khusus untuk Lord of Magic!');
         const testEmbed = new EmbedBuilder()
@@ -328,7 +292,7 @@ client.on(Events.MessageCreate, async (message) => {
         return; 
     }
 
-    // B. GENERAL MAGICAL COMMANDS (Bisa digunakan semua member)
+    // B. GENERAL MAGICAL COMMANDS (Dapat digunakan semua member)
     if (command === '!profile') {
         const loadingMessage = await message.reply('✨ Meracik lembar profil magis dari arsip Hogwarts...');
 
@@ -339,8 +303,7 @@ client.on(Events.MessageCreate, async (message) => {
         const userData = db.users[targetUser.id] || { xp: 0, level: 1, pointsContributed: 0 };
         
         try {
-            const profileAttachment = await generateProfileCard(userData, targetUser, targetMember);
-            // Menambahkan keterangan siapa yang memanggil command (!profile)
+            const profileAttachment = await generateProfileCard(userData, targetUser, targetMember, message.author);
             await message.channel.send({ content: `Penyihir ${message.author}, inilah lembar arsip sihir dari profil **${targetUser.username}**:`, files: [profileAttachment] });
             loadingMessage.delete();
         } catch (error) {
