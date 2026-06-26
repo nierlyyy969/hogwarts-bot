@@ -1,6 +1,7 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+const { createCanvas, loadImage } = require('@napi-rs/canvas');
 
 const {
     Client,
@@ -9,7 +10,8 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    EmbedBuilder
+    EmbedBuilder,
+    AttachmentBuilder
 } = require('discord.js');
 
 const client = new Client({
@@ -21,53 +23,82 @@ const client = new Client({
     ]
 });
 
-// ID Owner Server (Lord) & ID Channel Level Up
+// ==========================================
+// PENGATURAN GLOBAL HOGWARTS
+// ==========================================
 const OWNER_ID = '1180180812327559310'; 
 const LEVEL_UP_CHANNEL_ID = '1475801714425860272'; 
-const HOGWARTS_GIF = 'https://cdn.discordapp.com/attachments/1502882871612805283/1502886909570060339/-4.gif?ex=6a3ea5c1&is=6a3d5441&hm=c230bca22b037a6bdd70b38daeddd5f2f42302ad62a08939374aeb8b22279f07&';
 
-// Setup Penyimpanan Leveling JSON Lokal
+// Direct Link Aset Perkamen & Logo Asrama
+const MAIN_BG_URL = 'https://i.imgur.com/1gKWPaA.png'; 
+
+const houses = [
+    { 
+        id: '1475605712938864796', 
+        name: 'Gryffindor', 
+        emoji: '🦁', 
+        img: 'https://i.imgur.com/1go5VXj.png' 
+    },
+    { 
+        id: '1475786100210401413', 
+        name: 'Slytherin', 
+        emoji: '🐍', 
+        img: 'https://i.imgur.com/gPLI7Fo.png' 
+    },
+    { 
+        id: '1475786808167235604', 
+        name: 'Ravenclaw', 
+        emoji: '🦅', 
+        img: 'https://i.imgur.com/SiyKVTW.png' 
+    },
+    { 
+        id: '1475787032759631965', 
+        name: 'Hufflepuff', 
+        emoji: '🦡', 
+        img: 'https://i.imgur.com/7PyCEAA.png' 
+    }
+];
+
+// Setup Penyimpanan JSON Lokal
 const dataPath = path.join(__dirname, 'users.json');
 
-function getUserData() {
+function getDbData() {
     if (!fs.existsSync(dataPath)) {
-        fs.writeFileSync(dataPath, JSON.stringify({}));
+        fs.writeFileSync(dataPath, JSON.stringify({ users: {}, housePoints: { 'Gryffindor': 0, 'Slytherin': 0, 'Ravenclaw': 0, 'Hufflepuff': 0 } }, null, 2));
     }
     return JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
 }
 
-function saveUserData(data) {
+function saveDbData(data) {
     fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
 }
 
-// RUMUS DINAMIS TARGET XP (Makin tinggi level, makin susah)
 function getXpNeededForNextLevel(level) {
     if (level >= 500) {
-        return Math.floor(500 * Math.pow(level, 1.5)); // Level 500-1000: Sangat Hardcore
+        return Math.floor(500 * Math.pow(level, 1.5));
     } else {
-        return level * 500; // Level 1-499: Normal / Possible
+        return level * 500;
     }
 }
 
-// DAFTAR GELAR SIHIR HARRY POTTER LENGKAP (1 - 1000+)
 function getWizardTitle(level, userId) {
     if (userId === OWNER_ID) return '👑 Lord of Magic';
     if (level >= 900) return '🧙‍♂️ Ancient Archmage';
-    if (level >= 800) return '🏛️ Grand Sorcerer of the Order';
-    if (level >= 700) return '📜 Chief Warlock of the Wizengamot';
-    if (level >= 600) return '🛡️ Order of the Merlin (First Class)';
+    if (level >= 800) return '🏛️ Grand Sorcerer';
+    if (level >= 700) return '📜 Chief Warlock';
+    if (level >= 600) return '🛡️ Order of the Merlin';
     if (level >= 500) return '🏰 Auror Commander';
-    if (level >= 400) return '🦅 Senior Undersecretary';
-    if (level >= 300) return '🦁 Department Head of Magic';
-    if (level >= 200) return '🧹 Elite Auror Office';
+    if (level >= 400) return '🦅 Undersecretary';
+    if (level >= 300) return '🦁 Department Head';
+    if (level >= 200) return '🧹 Elite Auror';
     if (level >= 150) return '🧪 Master Alchemist';
-    if (level >= 100) return '🔮 Ministry of Magic Official';
-    if (level >= 75)  return '🌟 Hogwarts Head Boy / Head Girl';
-    if (level >= 50)  return '🦡 Hogwarts Prefect';
+    if (level >= 100) return '🔮 Ministry Official';
+    if (level >= 75)  return '🌟 Head Boy / Head Girl';
+    if (level >= 50)  return '🦡 Prefect';
     if (level >= 40)  return '🎓 Hogwarts Graduate';
-    if (level >= 35)  return '🧹 Seventh Year (N.E.W.T. Level)';
+    if (level >= 35)  return '🧹 Seventh Year';
     if (level >= 30)  return '📚 Sixth Year';
-    if (level >= 25)  return '🧪 Fifth Year (O.W.L. Level)';
+    if (level >= 25)  return '🧪 Fifth Year (O.W.L.)';
     if (level >= 20)  return '🛡️ Fourth Year';
     if (level >= 15)  return '🦅 Third Year';
     if (level >= 10)  return '📜 Second Year';
@@ -75,21 +106,101 @@ function getWizardTitle(level, userId) {
     return '🌱 New Student';
 }
 
-// Pengaturan Rumah Asrama (Sorting Hat)
-const houses = [
-    { id: '1475605712938864796', name: '🦁 Gryffindor' },
-    { id: '1475786100210401413', name: '🐍 Slytherin' },
-    { id: '1475786808167235604', name: '🦅 Ravenclaw' },
-    { id: '1475787032759631965', name: '🦡 Hufflepuff' }
-];
-
 const xpCooldowns = new Set();
 
 client.once(Events.ClientReady, () => {
     console.log(`Logged in as ${client.user.tag}`);
 });
 
-// EVENT HANDLER CHAT (Sistem Leveling, Perintah Admin, & Fitur Seru)
+// ==========================================
+// 🪄 SISTEM GENERATOR PROFIL (CANVAS)
+// ==========================================
+async function generateProfileCard(userData, user, guildMember) {
+    const canvas = createCanvas(1200, 750);
+    const ctx = canvas.getContext('2d');
+
+    // 1. Gambar Latar Belakang Perkamen Antik Hogwarts
+    const background = await loadImage(MAIN_BG_URL);
+    ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+
+    // 2. Muat Avatar Discord user
+    const avatar = await loadImage(user.displayAvatarURL({ extension: 'png', size: 512 }));
+    
+    // 3. Tentukan Logo Asrama User (Jika ada)
+    const houseObj = houses.find(h => guildMember?.roles.cache.has(h.id));
+
+    // --- MENGGAMBAR AVATAR ---
+    // Potongan melingkar untuk avatar (x: 200, y: 350, jari-jari 110)
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(200, 350, 110, 0, Math.PI * 2, true);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(avatar, 90, 240, 220, 220); 
+    ctx.restore();
+
+    // Bingkai perak avatar
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = '#b0b7bd'; 
+    ctx.beginPath();
+    ctx.arc(200, 350, 110, 0, Math.PI * 2, true);
+    ctx.stroke();
+
+    // --- MENGGAMBAR LOGO ASRAMA ---
+    if (houseObj) {
+        const houseLogo = await loadImage(houseObj.img);
+        // Posisi logo asrama di plakat tengah ledger (x: 480, y: 220, ukuran 240x240)
+        ctx.drawImage(houseLogo, 480, 220, 240, 240);
+    }
+
+    // --- MENGGAMBAR TEKS & DATA ---
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#2c221e'; // Tinta antik
+
+    // Username di bawah avatar
+    ctx.font = '32px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(user.username, 200, 490);
+
+    // Level & Gelar (Kanan)
+    ctx.textAlign = 'left';
+    ctx.font = '72px Georgia, serif';
+    ctx.fillText(`Level ${userData.level}`, 800, 330);
+
+    const title = getWizardTitle(userData.level, user.id);
+    ctx.font = '36px Georgia, serif';
+    ctx.fillStyle = user.id === OWNER_ID ? '#b38f00' : '#2c221e'; // Emas untuk Lord
+    ctx.fillText(title, 800, 380);
+
+    // House Cup Contribution (Bawah kanan)
+    ctx.fillStyle = '#2c221e';
+    ctx.font = '32px Georgia, serif';
+    ctx.fillText(`${userData.pointsContributed.toLocaleString()} Points`, 850, 615);
+
+    // --- MENGGAMBAR PROGRESS BAR XP (Kiri Bawah) ---
+    const xpNeeded = getXpNeededForNextLevel(userData.level);
+    const xpPercentage = Math.min(userData.xp / xpNeeded, 1);
+    
+    // Latar Bar 
+    ctx.fillStyle = '#d9cfc1'; 
+    ctx.fillRect(280, 615, 400, 40);
+
+    // Isi Bar Progress
+    ctx.fillStyle = '#4169e1'; // Biru Sihir
+    ctx.fillRect(280, 615, 400 * xpPercentage, 40);
+
+    // Teks Progress XP
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '24px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${userData.xp.toLocaleString()} / ${xpNeeded.toLocaleString()} XP`, 480, 642);
+
+    return new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'profile.png' });
+}
+
+// ==========================================
+// EVENT HANDLER CHAT (Sistem Leveling & Command)
+// ==========================================
 client.on(Events.MessageCreate, async (message) => {
     if (message.author.bot || !message.guild) return;
 
@@ -98,111 +209,86 @@ client.on(Events.MessageCreate, async (message) => {
     const command = args[0].toLowerCase();
 
     const levelUpChannel = message.guild.channels.cache.get(LEVEL_UP_CHANNEL_ID) || message.channel;
+    const userHouseObj = houses.find(h => message.member.roles.cache.has(h.id));
 
-    // ==========================================
-    // A. COMMAND KHUSUS OWNER (ADMIN COMMANDS)
-    // ==========================================
-    
-    // 1. Perintah !setlevel @User <angka>
+    // A. ADMIN COMMANDS
     if (command === '!setlevel') {
-        if (userId !== OWNER_ID) {
-            return message.reply('❌ Kamu tidak memiliki otoritas kekuatan sihir (Hanya untuk Lord Server)!');
-        }
-
+        if (userId !== OWNER_ID) return message.reply('❌ Hanya Lord yang berhak memanipulasi tingkat sihir!');
         const targetUser = message.mentions.users.first();
         const newLevel = parseInt(args[2]);
 
-        if (!targetUser || isNaN(newLevel)) {
-            return message.reply('🔮 **Format Salah!** Gunakan: `!setlevel @User <angka_level>`');
-        }
+        if (!targetUser || isNaN(newLevel)) return message.reply('🔮 **Format Salah!** Gunakan: `!setlevel @User <angka_level>`');
+        if (targetUser.id !== OWNER_ID && newLevel > 1000) return message.reply('❌ Batas maksimal tingkat sihir member adalah Level 1000!');
+        if (targetUser.id === OWNER_ID && newLevel > 9999) return message.reply('❌ Batas maksimal kekuatan Lord adalah Level 9999!');
 
-        if (targetUser.id !== OWNER_ID && newLevel > 1000) {
-            return message.reply('❌ Batas maksimal tingkat level untuk penyihir biasa (member) adalah Level 1000!');
-        }
-        if (targetUser.id === OWNER_ID && newLevel > 9999) {
-            return message.reply('❌ Batas maksimal kekuatan Lord adalah Level 9999!');
-        }
+        let db = getDbData();
+        if (!db.users[targetUser.id]) db.users[targetUser.id] = { xp: 0, level: 1, pointsContributed: 0 };
 
-        let db = getUserData();
-        if (!db[targetUser.id]) db[targetUser.id] = { xp: 0, level: 1 };
+        db.users[targetUser.id].level = newLevel;
+        db.users[targetUser.id].xp = 0; 
+        saveDbData(db);
 
-        db[targetUser.id].level = newLevel;
-        db[targetUser.id].xp = 0; 
-        saveUserData(db);
-
-        // Kirim notifikasi embed ke channel level up khusus
-        const newTitle = getWizardTitle(newLevel, targetUser.id);
-        const adminSetEmbed = new EmbedBuilder()
-            .setColor('#25a5cf')
-            .setTitle('✨ Hogwarts Power Awakening!')
-            .setDescription(`Kekuatan sihir <@${targetUser.id}> telah disesuaikan oleh Lord! Berada di **Level ${newLevel}** dengan gelar **${newTitle}**! 🎓`)
-            .setImage(HOGWARTS_GIF)
-            .setTimestamp();
-
-        await levelUpChannel.send({ embeds: [adminSetEmbed] });
-
-        return message.reply(`✅ Berhasil mengubah tingkat sihir ${targetUser} menjadi **Level ${newLevel}**!`);
+        message.reply(`✅ Berhasil mengubah tingkat sihir ${targetUser} menjadi **Level ${newLevel}**!`);
+        return;
     }
 
-    // 2. Perintah !addlevel @User <angka>
-    if (command === '!addlevel') {
-        if (userId !== OWNER_ID) {
-            return message.reply('❌ Kamu tidak memiliki otoritas kekuatan sihir (Hanya untuk Lord Server)!');
-        }
+    if (command === '!givepoint') {
+        if (userId !== OWNER_ID) return message.reply('❌ Hanya Lord yang bisa memberikan berkah poin asrama!');
+        const targetMember = message.mentions.members.first();
+        const points = parseInt(args[2]);
 
-        const targetUser = message.mentions.users.first();
-        const levelToAdd = parseInt(args[2]);
+        if (!targetMember || isNaN(points)) return message.reply('🔮 **Format Salah!** Gunakan: `!givepoint @User <jumlah_poin>`');
 
-        if (!targetUser || isNaN(levelToAdd)) {
-            return message.reply('🔮 **Format Salah!** Gunakan: `!addlevel @User <jumlah_level>`');
-        }
+        const targetHouse = houses.find(h => targetMember.roles.cache.has(h.id));
+        if (!targetHouse) return message.reply('❌ Penyihir tersebut belum bergabung dengan asrama Hogwarts mana pun!');
 
-        let db = getUserData();
-        if (!db[targetUser.id]) db[targetUser.id] = { xp: 0, level: 1 };
+        let db = getDbData();
+        if (!db.users[targetMember.id]) db.users[targetMember.id] = { xp: 0, level: 1, pointsContributed: 0 };
 
-        const finalLevel = db[targetUser.id].level + levelToAdd;
+        db.housePoints[targetHouse.name] += points;
+        db.users[targetMember.id].pointsContributed += points;
+        saveDbData(db);
 
-        if (targetUser.id !== OWNER_ID && finalLevel > 1000) {
-            return message.reply('❌ Penambahan level gagal! Tingkat member biasa tidak boleh menembus Level 1000.');
-        }
-        if (targetUser.id === OWNER_ID && finalLevel > 9999) {
-            return message.reply('❌ Tingkat kekuatan Lord tidak bisa melebihi Level 9999.');
-        }
-
-        db[targetUser.id].level = finalLevel;
-        saveUserData(db);
-
-        // Kirim notifikasi embed ke channel level up khusus
-        const newTitle = getWizardTitle(finalLevel, targetUser.id);
-        const adminAddEmbed = new EmbedBuilder()
-            .setColor('#25a5cf')
-            .setTitle('✨ Hogwarts Academy Level Up!')
-            .setDescription(`Selamat! <@${targetUser.id}> mendapatkan berkah tingkat sihir tambahan dan naik ke **Level ${finalLevel}** bergelar **${newTitle}**! 🎓`)
-            .setImage(HOGWARTS_GIF)
-            .setTimestamp();
-
-        await levelUpChannel.send({ embeds: [adminAddEmbed] });
-
-        return message.reply(`✅ Berhasil menambahkan +${levelToAdd} level ke ${targetUser}. Sekarang berada di **Level ${finalLevel}**!`);
+        return message.reply(`🏆 **+${points.toLocaleString()} Poin** telah dianugerahkan ke asrama **${targetHouse.emoji} ${targetHouse.name}** berkat prestasi ${targetMember}!`);
     }
 
-    // ==========================================
-    // B. FUN COMMANDS & TEST COMMANDS
-    // ==========================================
+    // B. GENERAL MAGICAL COMMANDS
+    if (command === '!profile') {
+        const loadingMessage = await message.reply('✨ Meracik lembar profil magis dari arsip Hogwarts...');
 
-    if (command === '!levelup') {
-        const testEmbed = new EmbedBuilder()
+        const targetUser = message.mentions.users.first() || message.author;
+        const targetMember = message.guild.members.cache.get(targetUser.id);
+        
+        let db = getDbData();
+        const userData = db.users[targetUser.id] || { xp: 0, level: 1, pointsContributed: 0 };
+        
+        try {
+            const profileAttachment = await generateProfileCard(userData, targetUser, targetMember);
+            await message.channel.send({ content: `Penyihir ${targetUser}, inilah lembar arsip sihirmu:`, files: [profileAttachment] });
+            loadingMessage.delete();
+        } catch (error) {
+            console.error('Gagal meracik kanvas profil:', error);
+            loadingMessage.edit('❌ Gagal meracik sihir profil. Pastikan tautan gambar latar dan asrama sudah benar.');
+        }
+        return;
+    }
+
+    if (command === '!leaderboard') {
+        let db = getDbData();
+        const sortedHouses = Object.entries(db.housePoints).sort((a, b) => b[1] - a[1]);
+
+        const lbEmbed = new EmbedBuilder()
             .setColor('#25a5cf')
-            .setTitle('✨ Hogwarts Academy Level Up!')
-            .setDescription(`Selamat! ${message.author} telah naik ke **Level 2** dan sekarang bergelar **🌱 First Year**! 🎓`)
-            .setImage(HOGWARTS_GIF)
+            .setTitle('🏆 House Cup Tournament - Leaderboard')
+            .setDescription('Klasemen asrama Hogwarts saat ini:\n\n' + sortedHouses.map((house, index) => {
+                const houseMeta = houses.find(h => h.name === house[0]);
+                const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '📜';
+                return `${medal} **Rank ${index + 1}**: ${houseMeta.emoji} **${house[0]}** — \`${house[1].toLocaleString()} Poin\``;
+            }).join('\n'))
+            .setFooter({ text: 'Gunakan ketepatan sihir untuk memimpin!' })
             .setTimestamp();
 
-        await levelUpChannel.send({ embeds: [testEmbed] });
-        if (levelUpChannel.id !== message.channel.id) {
-            message.reply('✅ Pesan simulasi level-up telah dikirim ke channel khusus!');
-        }
-        return; 
+        return message.channel.send({ embeds: [lbEmbed] });
     }
 
     if (command === '!sortinghat') {
@@ -211,75 +297,63 @@ client.on(Events.MessageCreate, async (message) => {
             .setTitle('🎩 The Sorting Hat')
             .setDescription('Welcome to **Hogwarts Academy**\n\nSilahkan tekan tombol di bawah dan biarkan Sorting Hat menentukan kelasmu!')
             .setFooter({ text: 'Hogwarts Academy • House Selection' })
-            .setTimestamp()
-            .setImage(HOGWARTS_GIF);
+            .setTimestamp();
 
-        const row = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('sorting_hat')
-                    .setLabel('Mencari Kelas')
-                    .setEmoji('🎩')
-                    .setStyle(ButtonStyle.Success)
-            );
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('sorting_hat').setLabel('Mencari Kelas').setEmoji('🎩').setStyle(ButtonStyle.Success)
+        );
 
         await message.channel.send({ embeds: [embed], components: [row] });
         return;
     }
 
-    // ==========================================
-    // C. AUTOMATIC XP & LEVELING SYSTEM (DILOCK ROLE)
-    // ==========================================
+    // C. AUTOMATIC XP & LEVELING SYSTEM
     if (!xpCooldowns.has(userId)) {
         try {
-            const hasHouseRole = message.member.roles.cache.some(role => houses.some(house => house.id === role.id));
-            
-            if (!hasHouseRole && userId !== OWNER_ID) {
-                return; 
+            if (!userHouseObj && userId !== OWNER_ID) return; 
+
+            let db = getDbData();
+            if (!db.users[userId]) {
+                db.users[userId] = { xp: 0, level: 1, pointsContributed: 0 };
             }
 
-            let db = getUserData();
-
-            if (!db[userId]) {
-                db[userId] = { xp: 0, level: 1 };
-            }
-
-            if (userId !== OWNER_ID && db[userId].level >= 1000) return;
-            if (userId === OWNER_ID && db[userId].level >= 9999) return;
+            if (userId !== OWNER_ID && db.users[userId].level >= 1000) return;
+            if (userId === OWNER_ID && db.users[userId].level >= 9999) return;
 
             const xpGained = Math.floor(Math.random() * 11) + 15;
-            db[userId].xp += xpGained;
+            db.users[userId].xp += xpGained;
 
-            const xpNeeded = getXpNeededForNextLevel(db[userId].level);
+            if (userHouseObj) {
+                db.housePoints[userHouseObj.name] += 1;
+                db.users[userId].pointsContributed += 1;
+            }
 
-            if (db[userId].xp >= xpNeeded) {
-                db[userId].xp -= xpNeeded; 
-                db[userId].level += 1; 
+            const xpNeeded = getXpNeededForNextLevel(db.users[userId].level);
 
-                const newTitle = getWizardTitle(db[userId].level, userId);
+            if (db.users[userId].xp >= xpNeeded) {
+                db.users[userId].xp -= xpNeeded; 
+                db.users[userId].level += 1; 
 
+                const newTitle = getWizardTitle(db.users[userId].level, userId);
                 const levelUpEmbed = new EmbedBuilder()
                     .setColor('#25a5cf')
                     .setTitle('✨ Hogwarts Academy Level Up!')
-                    .setDescription(`Selamat! <@${userId}> telah naik ke **Level ${db[userId].level}** dan sekarang bergelar **${newTitle}**! 🎓`)
-                    .setImage(HOGWARTS_GIF)
+                    .setDescription(`Selamat! <@${userId}> telah naik ke **Level ${db.users[userId].level}** dan sekarang bergelar **${newTitle}**! 🎓`)
                     .setTimestamp();
 
                 await levelUpChannel.send({ embeds: [levelUpEmbed] });
             }
 
-            saveUserData(db);
-
+            saveDbData(db);
             xpCooldowns.add(userId);
             setTimeout(() => xpCooldowns.delete(userId), 60000);
 
         } catch (err) {
-            console.error('Ada masalah saat memproses XP:', err);
+            console.error('Masalah saat memproses XP:', err);
         }
     }
 });
 
-// INTERAKSI TOMBOL (Sorting Hat)
 client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isButton()) return;
     if (interaction.customId !== 'sorting_hat') return;
@@ -298,7 +372,7 @@ client.on(Events.InteractionCreate, async interaction => {
     await member.roles.add(randomHouse.id);
 
     await interaction.reply({
-        content: `🎩 The Sorting Hat has chosen...\n\n${randomHouse.name}!`,
+        content: `🎩 The Sorting Hat has chosen...\n\n${randomHouse.emoji} ${randomHouse.name}!`,
         ephemeral: true
     });
 });
