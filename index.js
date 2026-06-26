@@ -11,7 +11,6 @@ const {
     EmbedBuilder
 } = require('discord.js');
 
-// Mengambil model User yang ada di folder /models
 const User = require('./models/User'); 
 
 const client = new Client({
@@ -37,7 +36,6 @@ const HOUSES_DATA = [
     { id: '1475787032759631965', name: 'Hufflepuff', emoji: '🦡', command: 'hufflepuff' }
 ];
 
-// Inisialisasi Poin Asrama Sementara di Memori
 let housePointsCache = {
     'Gryffindor': 0,
     'Slytherin': 0,
@@ -252,19 +250,19 @@ client.on(Events.MessageCreate, async (message) => {
 
     // Blokir command umum jika belum mendapat role kelas asrama
     if (!isSorted && !isOwner) {
-        if (['!profile', '!leaderboard', '!roster', '!rosterslytherin', '!rostergryffindor', '!rosterravenclaw', '!rosterhufflepuff'].some(cmd => command.startsWith(cmd))) {
+        if (['!profile', '!leaderboard', '!student'].some(cmd => command.startsWith(cmd))) {
             return message.reply('❌ **Akses Ditolak!** Perintah ini hanya boleh digunakan oleh murid yang sudah memiliki Role Asrama / Kelas (Lewat The Sorting Hat). Silakan hubungi Lord of Magic!');
         }
     }
 
     // B. GENERAL MAGICAL COMMANDS
     if (command === '!profile') {
-        await message.guild.members.fetch();
+        // Mencegah rate limit dengan tidak selalu men-fetch member cache besar
         const targetUser = message.mentions.users.first() || message.author;
         const targetMember = message.guild.members.cache.get(targetUser.id);
         
         if (!targetMember) {
-            return message.reply('❌ Terjadi kesalahan: Penyihir tidak ditemukan di dalam server ini.');
+            return message.reply('❌ Terjadi kesalahan: Penyihir tidak ditemukan di dalam cache server ini. Coba lagi nanti.');
         }
 
         let userLevel, userXp, xpNeeded, wizardTitle;
@@ -340,43 +338,48 @@ client.on(Events.MessageCreate, async (message) => {
         return message.channel.send({ embeds: [lbEmbed] });
     }
 
-    // FITUR TAMBAHAN: Roster Anggota Asrama (Hanya Nomor dan Display Name murni)
-    const targetHouseRoster = HOUSES_DATA.find(h => `!roster${h.command}` === command);
-    if (targetHouseRoster) {
-        await message.guild.members.fetch(); 
+    // C. ROSTER TERPADU !student
+    if (command === '!student') {
+        await message.guild.members.fetch();
 
-        const membersInHouse = message.guild.members.cache.filter(member => 
-            member.roles.cache.has(targetHouseRoster.id) && !member.user.bot
-        );
+        const embed = new EmbedBuilder()
+            .setColor('#25a5cf')
+            .setTitle('🎓 Hogwarts Academy Student Roster')
+            .setDescription('Daftar seluruh murid aktif yang telah dikelompokkan ke asrama masing-masing.')
+            .setTimestamp()
+            .setFooter({ text: 'Hogwarts Academy Roster System', iconURL: client.user.displayAvatarURL() });
 
-        let rosterDescription = `📜 **Daftar Penyihir Asrama ${targetHouseRoster.emoji} ${targetHouseRoster.name}**:\n\n`;
-        
-        if (membersInHouse.size === 0) {
-            rosterDescription += '*(Belum ada penyihir yang masuk asrama ini)*';
-        } else {
-            let counter = 1;
-            const listDisplay = membersInHouse.map(member => {
-                const displayName = member.displayName;
-                const formattedItem = `${counter}. **${displayName}**`;
-                counter++;
-                return formattedItem;
-            }).join('\n');
-            
-            rosterDescription += listDisplay;
+        // Loop per asrama untuk memisahkan daftar murid secara presisi
+        for (const house of HOUSES_DATA) {
+            const membersInHouse = message.guild.members.cache.filter(member => 
+                member.roles.cache.has(house.id) && !member.user.bot
+            );
+
+            let houseList = '';
+            if (membersInHouse.size === 0) {
+                houseList = '*(Belum ada murid)*';
+            } else {
+                let counter = 1;
+                houseList = membersInHouse.map(member => {
+                    const name = member.displayName;
+                    const item = `${counter}. **${name}**`;
+                    counter++;
+                    return item;
+                }).join('\n');
+            }
+
+            embed.addFields({
+                name: `${house.emoji} ${house.name} (${membersInHouse.size} Murid)`,
+                value: houseList,
+                inline: false
+            });
         }
 
-        const rosterEmbed = new EmbedBuilder()
-            .setColor('#25a5cf')
-            .setTitle(`✨ ${targetHouseRoster.emoji} Roster Anggota ${targetHouseRoster.name} ✨`)
-            .setDescription(rosterDescription)
-            .setTimestamp()
-            .setFooter({ text: `Total Anggota: ${membersInHouse.size} Penyihir`, iconURL: client.user.displayAvatarURL() });
-
-        await message.channel.send({ embeds: [rosterEmbed] });
+        await message.channel.send({ embeds: [embed] });
         return;
     }
 
-    // C. AUTOMATIC XP SYSTEM (Chat Text - 15 XP Flat)
+    // AUTOMATIC XP SYSTEM (Chat Text - 15 XP Flat)
     if (userId !== OWNER_ID && !xpCooldowns.has(userId)) {
         try {
             let userDoc = await User.findOne({ userId, guildId: message.guild.id });
@@ -436,7 +439,6 @@ client.on(Events.MessageCreate, async (message) => {
     }
 });
 
-// INTERACTION HANDLER (Tombol Sorting Hat)
 client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isButton()) return;
     if (interaction.customId !== 'sorting_hat') return;
