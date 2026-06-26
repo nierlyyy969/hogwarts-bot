@@ -21,6 +21,11 @@ const client = new Client({
     ]
 });
 
+// ID Owner Server (Lord) & ID Channel Level Up
+const OWNER_ID = '1180180812327559310'; 
+const LEVEL_UP_CHANNEL_ID = '1475801714425860272'; 
+const HOGWARTS_GIF = 'https://cdn.discordapp.com/attachments/1502882871612805283/1502886909570060339/-4.gif?ex=6a3ea5c1&is=6a3d5441&hm=c230bca22b037a6bdd70b38daeddd5f2f42302ad62a08939374aeb8b22279f07&';
+
 // Setup Penyimpanan Leveling JSON Lokal
 const dataPath = path.join(__dirname, 'users.json');
 
@@ -35,26 +40,40 @@ function saveUserData(data) {
     fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
 }
 
-// Gelar Penyihir Berdasarkan Level
-function getWizardTitle(level) {
-    if (level >= 50) return '🧙‍♂️ Headmaster';
-    if (level >= 40) return '🛡️ Professor';
-    if (level >= 35) return '🎓 Graduate';
-    if (level >= 30) return '🧹 Seventh Year';
-    if (level >= 25) return '🦁 Sixth Year';
-    if (level >= 20) return '🐍 Fifth Year';
-    if (level >= 15) return '🦡 Fourth Year';
-    if (level >= 10) return '🦅 Third Year';
-    if (level >= 5)  return '📜 Second Year';
-    return '🌱 First Year';
+// RUMUS DINAMIS TARGET XP (Makin tinggi level, makin susah)
+function getXpNeededForNextLevel(level) {
+    if (level >= 500) {
+        return Math.floor(500 * Math.pow(level, 1.5)); // Level 500-1000: Sangat Hardcore
+    } else {
+        return level * 500; // Level 1-499: Normal / Possible
+    }
 }
 
-// Sistem Cooldown XP (1 Menit)
-const xpCooldowns = new Set();
-const LEVEL_UP_CHANNEL_ID = '1475801714425860272'; 
-
-// Link Gambar GIF Hogwarts untuk Level Up & Sorting Hat
-const HOGWARTS_GIF = 'https://cdn.discordapp.com/attachments/1502882871612805283/1502886909570060339/-4.gif?ex=6a3ea5c1&is=6a3d5441&hm=c230bca22b037a6bdd70b38daeddd5f2f42302ad62a08939374aeb8b22279f07&';
+// DAFTAR GELAR SIHIR HARRY POTTER LENGKAP (1 - 1000+)
+function getWizardTitle(level, userId) {
+    if (userId === OWNER_ID) return '👑 Lord of Magic';
+    if (level >= 900) return '🧙‍♂️ Ancient Archmage';
+    if (level >= 800) return '🏛️ Grand Sorcerer of the Order';
+    if (level >= 700) return '📜 Chief Warlock of the Wizengamot';
+    if (level >= 600) return '🛡️ Order of the Merlin (First Class)';
+    if (level >= 500) return '🏰 Auror Commander';
+    if (level >= 400) return '🦅 Senior Undersecretary';
+    if (level >= 300) return '🦁 Department Head of Magic';
+    if (level >= 200) return '🧹 Elite Auror Office';
+    if (level >= 150) return '🧪 Master Alchemist';
+    if (level >= 100) return '🔮 Ministry of Magic Official';
+    if (level >= 75)  return '🌟 Hogwarts Head Boy / Head Girl';
+    if (level >= 50)  return '🦡 Hogwarts Prefect';
+    if (level >= 40)  return '🎓 Hogwarts Graduate';
+    if (level >= 35)  return '🧹 Seventh Year (N.E.W.T. Level)';
+    if (level >= 30)  return '📚 Sixth Year';
+    if (level >= 25)  return '🧪 Fifth Year (O.W.L. Level)';
+    if (level >= 20)  return '🛡️ Fourth Year';
+    if (level >= 15)  return '🦅 Third Year';
+    if (level >= 10)  return '📜 Second Year';
+    if (level >= 5)   return '🌱 First Year';
+    return '🌱 New Student';
+}
 
 // Pengaturan Rumah Asrama (Sorting Hat)
 const houses = [
@@ -64,19 +83,90 @@ const houses = [
     { id: '1475787032759631965', name: '🦡 Hufflepuff' }
 ];
 
-// Event ketika bot aktif
+const xpCooldowns = new Set();
+
 client.once(Events.ClientReady, () => {
     console.log(`Logged in as ${client.user.tag}`);
 });
 
-// EVENT HANDLER CHAT (Sistem Leveling & Perintah)
+// EVENT HANDLER CHAT (Sistem Leveling, Perintah Admin, & Fitur Seru)
 client.on(Events.MessageCreate, async (message) => {
     if (message.author.bot || !message.guild) return;
 
     const userId = message.author.id;
+    const args = message.content.split(' ');
+    const command = args[0].toLowerCase();
 
-    // 1. PERINTAH TES INSTAN (!levelup)
-    if (message.content === '!levelup') {
+    // ==========================================
+    // A. COMMAND KHUSUS OWNER (ADMIN COMMANDS)
+    // ==========================================
+    
+    // 1. Perintah !setlevel @User <angka>
+    if (command === '!setlevel') {
+        if (userId !== OWNER_ID) {
+            return message.reply('❌ Kamu tidak memiliki otoritas kekuatan sihir (Hanya untuk Lord Server)!');
+        }
+
+        const targetUser = message.mentions.users.first();
+        const newLevel = parseInt(args[2]);
+
+        if (!targetUser || isNaN(newLevel)) {
+            return message.reply('🔮 **Format Salah!** Gunakan: `!setlevel @User <angka_level>`');
+        }
+
+        if (targetUser.id !== OWNER_ID && newLevel > 1000) {
+            return message.reply('❌ Batas maksimal tingkat level untuk penyihir biasa (member) adalah Level 1000!');
+        }
+        if (targetUser.id === OWNER_ID && newLevel > 9999) {
+            return message.reply('❌ Batas maksimal kekuatan Lord adalah Level 9999!');
+        }
+
+        let db = getUserData();
+        if (!db[targetUser.id]) db[targetUser.id] = { xp: 0, level: 1 };
+
+        db[targetUser.id].level = newLevel;
+        db[targetUser.id].xp = 0; 
+        saveUserData(db);
+
+        return message.reply(`✅ Berhasil mengubah tingkat sihir ${targetUser} menjadi **Level ${newLevel}**!`);
+    }
+
+    // 2. Perintah !addlevel @User <angka>
+    if (command === '!addlevel') {
+        if (userId !== OWNER_ID) {
+            return message.reply('❌ Kamu tidak memiliki otoritas kekuatan sihir (Hanya untuk Lord Server)!');
+        }
+
+        const targetUser = message.mentions.users.first();
+        const levelToAdd = parseInt(args[2]);
+
+        if (!targetUser || isNaN(levelToAdd)) {
+            return message.reply('🔮 **Format Salah!** Gunakan: `!addlevel @User <jumlah_level>`');
+        }
+
+        let db = getUserData();
+        if (!db[targetUser.id]) db[targetUser.id] = { xp: 0, level: 1 };
+
+        const finalLevel = db[targetUser.id].level + levelToAdd;
+
+        if (targetUser.id !== OWNER_ID && finalLevel > 1000) {
+            return message.reply('❌ Penambahan level gagal! Tingkat member biasa tidak boleh menembus Level 1000.');
+        }
+        if (targetUser.id === OWNER_ID && finalLevel > 9999) {
+            return message.reply('❌ Tingkat kekuatan Lord tidak bisa melebihi Level 9999.');
+        }
+
+        db[targetUser.id].level = finalLevel;
+        saveUserData(db);
+
+        return message.reply(`✅ Berhasil menambahkan +${levelToAdd} level ke ${targetUser}. Sekarang berada di **Level ${finalLevel}**!`);
+    }
+
+    // ==========================================
+    // B. FUN COMMANDS & TEST COMMANDS
+    // ==========================================
+
+    if (command === '!levelup') {
         const targetChannel = message.guild.channels.cache.get(LEVEL_UP_CHANNEL_ID) || message.channel;
 
         const testEmbed = new EmbedBuilder()
@@ -87,15 +177,13 @@ client.on(Events.MessageCreate, async (message) => {
             .setTimestamp();
 
         await targetChannel.send({ embeds: [testEmbed] });
-
         if (targetChannel.id !== message.channel.id) {
             message.reply('✅ Pesan simulasi level-up telah dikirim ke channel khusus!');
         }
         return; 
     }
 
-    // 2. PERINTAH SORTING HAT (!sortinghat)
-    if (message.content === '!sortinghat') {
+    if (command === '!sortinghat') {
         const embed = new EmbedBuilder()
             .setColor('#25a5cf')
             .setTitle('🎩 The Sorting Hat')
@@ -113,38 +201,43 @@ client.on(Events.MessageCreate, async (message) => {
                     .setStyle(ButtonStyle.Success)
             );
 
-        await message.channel.send({
-            embeds: [embed],
-            components: [row]
-        });
+        await message.channel.send({ embeds: [embed], components: [row] });
         return;
     }
 
-    // 3. SISTEM LEVELING XP OTOMATIS (Bukan Perintah)
+    // ==========================================
+    // C. AUTOMATIC XP & LEVELING SYSTEM (DILOCK ROLE)
+    // ==========================================
     if (!xpCooldowns.has(userId)) {
         try {
+            // Cek apakah member punya salah satu dari 4 role asrama Hogwarts (Bypass jika dia Owner)
+            const hasHouseRole = message.member.roles.cache.some(role => houses.some(house => house.id === role.id));
+            
+            if (!hasHouseRole && userId !== OWNER_ID) {
+                return; // 🔒 MUGGLE LOCK: Abaikan chat jika belum pilih asrama
+            }
+
             let db = getUserData();
 
-            // Inisialisasi data jika user baru pertama kali chat
             if (!db[userId]) {
                 db[userId] = { xp: 0, level: 1 };
             }
 
-            // Dapatkan XP acak 15-25
+            if (userId !== OWNER_ID && db[userId].level >= 1000) return;
+            if (userId === OWNER_ID && db[userId].level >= 9999) return;
+
             const xpGained = Math.floor(Math.random() * 11) + 15;
             db[userId].xp += xpGained;
 
-            // Hitung kalkulasi target naik level (Level saat ini * 500)
-            const xpNeeded = db[userId].level * 500;
+            const xpNeeded = getXpNeededForNextLevel(db[userId].level);
 
             if (db[userId].xp >= xpNeeded) {
-                db[userId].xp -= xpNeeded; // Sisa XP disimpan
-                db[userId].level += 1; // Level Naik
+                db[userId].xp -= xpNeeded; 
+                db[userId].level += 1; 
 
-                const newTitle = getWizardTitle(db[userId].level);
+                const newTitle = getWizardTitle(db[userId].level, userId);
                 const levelUpChannel = message.guild.channels.cache.get(LEVEL_UP_CHANNEL_ID) || message.channel;
 
-                // EMBED UTK KELAS UP OTOMATIS MEMBER REALTIME
                 const levelUpEmbed = new EmbedBuilder()
                     .setColor('#25a5cf')
                     .setTitle('✨ Hogwarts Academy Level Up!')
@@ -155,10 +248,8 @@ client.on(Events.MessageCreate, async (message) => {
                 await levelUpChannel.send({ embeds: [levelUpEmbed] });
             }
 
-            // Simpan perubahan ke file lokal users.json
             saveUserData(db);
 
-            // Aktifkan Cooldown 1 menit
             xpCooldowns.add(userId);
             setTimeout(() => xpCooldowns.delete(userId), 60000);
 
@@ -174,7 +265,6 @@ client.on(Events.InteractionCreate, async interaction => {
     if (interaction.customId !== 'sorting_hat') return;
 
     const member = interaction.member;
-
     const alreadySorted = houses.some(house => member.roles.cache.has(house.id));
 
     if (alreadySorted) {
@@ -185,7 +275,6 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 
     const randomHouse = houses[Math.floor(Math.random() * houses.length)];
-
     await member.roles.add(randomHouse.id);
 
     await interaction.reply({
