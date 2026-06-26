@@ -483,7 +483,10 @@ client.on(Events.MessageCreate, async (message) => {
             userXp = 0; 
             xpNeeded = getXpNeededForNextLevel(userLevel); 
             wizardTitle = 'Lord of Magic';
-            userGalleons = 999999;
+            
+            // Sinkronisasi balance asli Lord of Magic dari database (fallback ke 999,999 jika dokumen belum ada)
+            let ownerDoc = await User.findOne({ userId: targetUser.id, guildId: message.guild.id });
+            userGalleons = ownerDoc ? (ownerDoc.galleons || 0) : 999999;
         } else {
             let userDoc = await User.findOne({ userId: targetUser.id, guildId: message.guild.id });
             if (!userDoc) {
