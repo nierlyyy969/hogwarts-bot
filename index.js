@@ -36,11 +36,19 @@ const houses = [
 
 const dataPath = path.join(__dirname, 'users.json');
 
+// Membaca database dengan proteksi agar tidak gampang ke-reset kosong
 function getDbData() {
     if (!fs.existsSync(dataPath)) {
-        fs.writeFileSync(dataPath, JSON.stringify({ users: {}, housePoints: { 'Gryffindor': 0, 'Slytherin': 0, 'Ravenclaw': 0, 'Hufflepuff': 0 } }, null, 2));
+        // Membuat template default jika file benar-benar baru pertama kali dibuat
+        return { users: {}, housePoints: { 'Gryffindor': 0, 'Slytherin': 0, 'Ravenclaw': 0, 'Hufflepuff': 0 } };
     }
-    return JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+    try {
+        const rawData = fs.readFileSync(dataPath, 'utf-8');
+        return JSON.parse(rawData);
+    } catch (e) {
+        // Jika file corrupt saat kamu otak-atik, return object kosong agar tidak crash
+        return { users: {}, housePoints: { 'Gryffindor': 0, 'Slytherin': 0, 'Ravenclaw': 0, 'Hufflepuff': 0 } };
+    }
 }
 
 function saveDbData(data) {
@@ -54,6 +62,7 @@ function getXpNeededForNextLevel(level) {
     return level * 500;
 }
 
+// Penentu Gelar Berdasarkan Level
 function getWizardTitle(level, userId) {
     if (userId === OWNER_ID) return 'Lord of magic';
     if (level >= 900) return 'Ancient Archmage';
@@ -86,6 +95,18 @@ client.once(Events.ClientReady, () => {
 });
 
 // ==========================================
+// DETEKSI MEMBER KELUAR SERVER (RESET LEVEL)
+// ==========================================
+client.on(Events.GuildMemberRemove, (member) => {
+    let db = getDbData();
+    if (db.users[member.id]) {
+        delete db.users[member.id]; // Hapus data total jika member keluar
+        saveDbData(db);
+        console.log(`🧹 Data level dari ${member.user.username} telah di-reset karena keluar server.`);
+    }
+});
+
+// ==========================================
 // EVENT HANDLER CHAT (Sistem Utama)
 // ==========================================
 client.on(Events.MessageCreate, async (message) => {
@@ -105,8 +126,7 @@ client.on(Events.MessageCreate, async (message) => {
         const newLevel = parseInt(args[2]);
 
         if (!targetUser || isNaN(newLevel)) return message.reply('🔮 **Format Salah!** Gunakan: `!setlevel @User <angka_level>`');
-        if (targetUser.id !== OWNER_ID && newLevel > 1000) return message.reply('❌ Batas maksimal tingkat sihir member adalah Level 1000!');
-        if (targetUser.id === OWNER_ID && newLevel > 9999) return message.reply('❌ Batas maksimal kekuatan Lord adalah Level 9999!');
+        if (targetUser.id === OWNER_ID) return message.reply('👑 Level Lord sudah dikunci permanen di puncak tertinggi!');
 
         let db = getDbData();
         if (!db.users[targetUser.id]) db.users[targetUser.id] = { xp: 0, level: 1, pointsContributed: 0 };
@@ -139,7 +159,6 @@ client.on(Events.MessageCreate, async (message) => {
         return message.reply(`🏆 **+${points.toLocaleString()} Poin** telah dianugerahkan ke asrama **${targetHouse.emoji} ${targetHouse.name}** berkat prestasi ${targetMember}!`);
     }
 
-    // Command !levelup dikunci khusus Owner/Lord Server
     if (command === '!levelup') {
         if (userId !== OWNER_ID) return message.reply('❌ Perintah ini khusus untuk Lord of Magic!');
         const testEmbed = new EmbedBuilder()
@@ -161,27 +180,37 @@ client.on(Events.MessageCreate, async (message) => {
         const targetMember = message.guild.members.cache.get(targetUser.id);
         
         let db = getDbData();
-        const userData = db.users[targetUser.id] || { xp: 0, level: 1, pointsContributed: 0 };
         
-        // Ambil data asrama yang cocok dengan role user saat ini
+        // DEKLARASI VARIABEL DATA USER
+        let userLevel, userXp, xpNeeded, wizardTitle, pointsContributed;
+
+        // JIKA YANG DI-CEK ADALAH OWNER, LANGSUNG SET OTOMATIS TANPA BACA DATABASE
+        if (targetUser.id === OWNER_ID) {
+            userLevel = 9999;
+            userXp = 9999;
+            xpNeeded = 9999;
+            wizardTitle = 'Lord of magic';
+            pointsContributed = db.users[OWNER_ID] ? db.users[OWNER_ID].pointsContributed : 0;
+        } else {
+            // Jika member lain, ambil dari database
+            const userData = db.users[targetUser.id] || { xp: 0, level: 1, pointsContributed: 0 };
+            userLevel = userData.level;
+            userXp = userData.xp;
+            xpNeeded = getXpNeededForNextLevel(userLevel);
+            wizardTitle = getWizardTitle(userLevel, targetUser.id);
+            pointsContributed = userData.pointsContributed;
+        }
+        
         const targetHouse = houses.find(h => targetMember.roles.cache.has(h.id));
         const houseName = targetHouse ? `${targetHouse.emoji} ${targetHouse.name}` : 'Belum Masuk Asrama';
 
-        // Ambil gelar berdasarkan level dan ID user
-        const wizardTitle = getWizardTitle(userData.level, targetUser.id);
-
-        // Kalkulasi batas XP untuk level saat ini
-        const xpNeeded = getXpNeededForNextLevel(userData.level);
-        const currentXp = userData.xp;
-
         // Membuat visualisasi teks Bar Progres (10 Balok)
         const totalBars = 10;
-        const percentage = Math.min(currentXp / xpNeeded, 1);
+        const percentage = Math.min(userXp / xpNeeded, 1);
         const filledBars = Math.round(percentage * totalBars);
         const emptyBars = totalBars - filledBars;
         const progressBarText = '█'.repeat(filledBars) + '░'.repeat(emptyBars);
 
-        // Teks layout diblok dengan garis pembatas di sekelilingnya
         const profileDisplay = 
 `╔══════════════════════════════════════════╗
 ║              WIZARD PROFILE              ║
@@ -189,12 +218,12 @@ client.on(Events.MessageCreate, async (message) => {
   Nama          :  ${targetUser.username}
   Title         :  ${wizardTitle}
   Asrama        :  ${houseName}
-  Level         :  ${userData.level}
-  Point Asrama  :  ${userData.pointsContributed.toLocaleString()} Poin
+  Level         :  ${userLevel}
+  Point Asrama  :  ${pointsContributed.toLocaleString()} Poin
 ╠══════════════════════════════════════════╣
   BAR PROGRES NAIK LEVEL:
   [${progressBarText}] 
-  ${currentXp.toLocaleString()} / ${xpNeeded.toLocaleString()} XP
+  ${userXp.toLocaleString()} / ${xpNeeded.toLocaleString()} XP
 ╚══════════════════════════════════════════╝`;
 
         await message.channel.send(`\`\`\`text\n${profileDisplay}\n\`\`\``);
@@ -235,26 +264,23 @@ client.on(Events.MessageCreate, async (message) => {
         return;
     }
 
-    // C. AUTOMATIC XP & LEVELING SYSTEM
-    if (!xpCooldowns.has(userId)) {
+    // C. AUTOMATIC XP & LEVELING SYSTEM (Hanya berjalan untuk Member, Owner tidak perlu)
+    if (userId !== OWNER_ID && !xpCooldowns.has(userId)) {
         try {
-            if (!userHouseObj && userId !== OWNER_ID) return; 
+            if (!userHouseObj) return; 
 
             let db = getDbData();
             if (!db.users[userId]) {
                 db.users[userId] = { xp: 0, level: 1, pointsContributed: 0 };
             }
 
-            if (userId !== OWNER_ID && db.users[userId].level >= 1000) return;
-            if (userId === OWNER_ID && db.users[userId].level >= 9999) return;
+            if (db.users[userId].level >= 1000) return;
 
             const xpGained = Math.floor(Math.random() * 11) + 15;
             db.users[userId].xp += xpGained;
 
-            if (userHouseObj) {
-                db.housePoints[userHouseObj.name] += 1;
-                db.users[userId].pointsContributed += 1;
-            }
+            db.housePoints[userHouseObj.name] += 1;
+            db.users[userId].pointsContributed += 1;
 
             const xpNeeded = getXpNeededForNextLevel(db.users[userId].level);
 
