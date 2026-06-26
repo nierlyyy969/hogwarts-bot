@@ -257,7 +257,6 @@ client.on(Events.MessageCreate, async (message) => {
 
     // B. GENERAL MAGICAL COMMANDS
     if (command === '!profile') {
-        // Mencegah rate limit dengan tidak selalu men-fetch member cache besar
         const targetUser = message.mentions.users.first() || message.author;
         const targetMember = message.guild.members.cache.get(targetUser.id);
         
@@ -338,7 +337,7 @@ client.on(Events.MessageCreate, async (message) => {
         return message.channel.send({ embeds: [lbEmbed] });
     }
 
-    // C. ROSTER TERPADU !student
+    // C. ROSTER TERPADU !student (Dengan Heading Markdown ##)
     if (command === '!student') {
         await message.guild.members.fetch();
 
@@ -349,7 +348,6 @@ client.on(Events.MessageCreate, async (message) => {
             .setTimestamp()
             .setFooter({ text: 'Hogwarts Academy Roster System', iconURL: client.user.displayAvatarURL() });
 
-        // Loop per asrama untuk memisahkan daftar murid secara presisi
         for (const house of HOUSES_DATA) {
             const membersInHouse = message.guild.members.cache.filter(member => 
                 member.roles.cache.has(house.id) && !member.user.bot
@@ -369,7 +367,7 @@ client.on(Events.MessageCreate, async (message) => {
             }
 
             embed.addFields({
-                name: `${house.emoji} ${house.name} (${membersInHouse.size} Murid)`,
+                name: `## ${house.emoji} ${house.name} (${membersInHouse.size} Murid)`,
                 value: houseList,
                 inline: false
             });
