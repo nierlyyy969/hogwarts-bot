@@ -18,7 +18,7 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildVoiceStates // Untuk mendeteksi durasi Voice Channel
+        GatewayIntentBits.GuildVoiceStates
     ]
 });
 
@@ -35,9 +35,9 @@ const houses = [
     { id: '1475787032759631965', name: 'Hufflepuff', emoji: '🦡' }
 ];
 
-const dataPath = path.join(__dirname, 'users.json');
+// PENTING: Arahkan database ke /tmp/ agar saat bot update/restart, data level/point TIDAK HILANG!
+const dataPath = path.join('/tmp', 'users_hogwarts.json');
 
-// Membaca database dengan proteksi
 function getDbData() {
     if (!fs.existsSync(dataPath)) {
         return { users: {}, housePoints: { 'Gryffindor': 0, 'Slytherin': 0, 'Ravenclaw': 0, 'Hufflepuff': 0 } };
@@ -54,13 +54,11 @@ function saveDbData(data) {
     fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
 }
 
-// Rumus Kelipatan Linear Sesuai Hitungan Target Level 1000
 function getXpNeededForNextLevel(level) {
-    if (level >= 9999) return 49995; // Limit display bar untuk owner
+    if (level >= 9999) return 49995;
     return level * 5; 
 }
 
-// Penentu Gelar Berdasarkan Level
 function getWizardTitle(level, userId) {
     if (userId === OWNER_ID) return 'Lord of Magic';
     if (level >= 900) return 'Ancient Archmage';
@@ -89,9 +87,8 @@ function getWizardTitle(level, userId) {
 const xpCooldowns = new Set();
 
 client.once(Events.ClientReady, () => {
-    console.log(`Logged in as ${client.user.tag}`);
+    console.log(`Logged in as ${client.user.tag} — Database loaded from: ${dataPath}`);
 
-    // LOOP INTERVAL VOICE CHANNEL XP (Berjalan otomatis setiap 1 menit)
     setInterval(async () => {
         try {
             let db = getDbData();
@@ -101,27 +98,21 @@ client.once(Events.ClientReady, () => {
                 guild.voiceStates.cache.forEach(async (voiceState) => {
                     const userId = voiceState.id;
 
-                    // Validasi: Harus berada di VC, bukan bot, dan bukan Owner
                     if (voiceState.channelId && !voiceState.member.user.bot && userId !== OWNER_ID) {
-                        
                         if (!db.users[userId]) {
                             db.users[userId] = { xp: 0, level: 1, pointsContributed: 0 };
                         }
 
-                        // Maksimal level member adalah 1000
                         if (db.users[userId].level >= 1000) return;
 
-                        // Tambahkan 12 XP per menit
                         db.users[userId].xp += 12;
 
-                        // Tambahkan poin ke asrama jika sudah bergabung (1 poin per menit di VC)
                         const userHouseObj = houses.find(h => voiceState.member.roles.cache.has(h.id));
                         if (userHouseObj) {
                             db.housePoints[userHouseObj.name] += 1;
                             db.users[userId].pointsContributed += 1;
                         }
 
-                        // Cek kelayakan naik level
                         let xpNeeded = getXpNeededForNextLevel(db.users[userId].level);
                         let levelUpOccurred = false;
                         let reachedLevelCheckpoint = false;
@@ -132,7 +123,7 @@ client.once(Events.ClientReady, () => {
                             xpNeeded = getXpNeededForNextLevel(db.users[userId].level);
                             levelUpOccurred = true;
 
-                            // Notifikasi hanya dipicu saat mencapai kelipatan 5 (5, 10, 15, dst)
+                            // Notifikasi Milestone kelipatan 5 (5, 10, 15, dst)
                             if (db.users[userId].level % 5 === 0) {
                                 reachedLevelCheckpoint = true;
                             }
@@ -144,7 +135,6 @@ client.once(Events.ClientReady, () => {
                             }
                         }
 
-                        // Kirim pesan Level Up hanya jika mencapai kelipatan 5
                         if (levelUpOccurred && reachedLevelCheckpoint) {
                             const newTitle = getWizardTitle(db.users[userId].level, userId);
                             const levelUpChannel = guild.channels.cache.get(LEVEL_UP_CHANNEL_ID);
@@ -169,10 +159,8 @@ client.once(Events.ClientReady, () => {
     }, 60000); 
 });
 
-// PENGAMANAN LEPAS GILD: Data tidak akan terhapus jika member keluar
 client.on(Events.GuildMemberRemove, (member) => {
-    // Dimatikan sementara agar database tidak ter-reset otomatis saat testing
-    // console.log(`🧹 Data level dari ${member.user.username} diabaikan.`);
+    // Proteksi data agar tidak terhapus saat member keluar server
 });
 
 // ==========================================
@@ -240,7 +228,7 @@ client.on(Events.MessageCreate, async (message) => {
         return; 
     }
 
-    // B. GENERAL MAGICAL COMMANDS
+    // B. GENERAL MAGICAL COMMANDS (Sistem Tampilan Profile Embed)
     if (command === '!profile') {
         const targetUser = message.mentions.users.first() || message.author;
         const targetMember = message.guild.members.cache.get(targetUser.id);
@@ -266,29 +254,37 @@ client.on(Events.MessageCreate, async (message) => {
         const targetHouse = houses.find(h => targetMember.roles.cache.has(h.id));
         const houseName = targetHouse ? `${targetHouse.emoji} ${targetHouse.name}` : 'Belum Masuk Asrama';
 
-        // Mengembalikan ukuran bar progres megah (32 kotak)
-        const totalBars = 32;
-        const percentage = xpNeeded > 0 ? Math.min(userXp / xpNeeded, 1) : 1;
-        const filledBars = Math.round(percentage * totalBars);
-        const emptyBars = totalBars - filledBars;
-        const progressBarText = '█'.repeat(filledBars) + '░'.repeat(emptyBars);
+        // Persentase Progres Bar Discord Embed Otomatis (Aman dan Presisi)
+        const progressPercentage = targetUser.id === OWNER_ID ? 100 : Math.min(Math.floor((userXp / xpNeeded) * 100), 100);
+        
+        const totalBlocks = 15;
+        const filledBlocks = Math.floor((progressPercentage / 100) * totalBlocks);
+        const emptyBlocks = totalBlocks - filledBlocks;
+        const visualBar = '▓'.repeat(filledBlocks) + '░'.repeat(emptyBlocks);
 
-        const profileDisplay = 
-`╔══════════════════════════════════════════╗
-║              ✨ WIZARD PROFILE ✨        ║
-╠══════════════════════════════════════════╣
-  🧙‍♂️ Nama         :  ${targetUser.username}
-  🏷️ Gelar         :  ${wizardTitle}
-  🏰 Asrama       :  ${houseName}
-  ⭐ Level        :  ${userLevel}
-  🏆 Poin Asrama  :  ${pointsContributed.toLocaleString()} Poin
-╠══════════════════════════════════════════╣
-  📈 PROGRES NAIK LEVEL:
-  [${progressBarText}]
-  ⚡ ${userXp.toLocaleString()} / ${xpNeeded.toLocaleString()} XP
-╚══════════════════════════════════════════╝`;
+        const profileEmbed = new EmbedBuilder()
+            .setColor('#25a5cf')
+            .setAuthor({ 
+                name: `✨ WIZARD PROFILE — ${targetUser.username.toUpperCase()} ✨`, 
+                iconURL: targetUser.displayAvatarURL({ dynamic: true }) 
+            })
+            .setDescription('Selamat datang di **Hogwarts Academy Magic System** 🏰✨')
+            .addFields(
+                { name: '🧙‍♂️ Nama Penyihir', value: `\`${targetUser.username}\``, inline: true },
+                { name: '🏷️ Gelar Sihir', value: `\`${wizardTitle}\``, inline: true },
+                { name: '🏰 Asrama Hogwarts', value: `${houseName}`, inline: true },
+                { name: '⭐ Level Saat Ini', value: `\`${userLevel}\``, inline: true },
+                { name: '🏆 Poin Kontribusi', value: `\`${pointsContributed.toLocaleString()} Poin\``, inline: true },
+                { name: '\u200B', value: '\u200B' }, // Baris Pemisah
+                { 
+                    name: `📈 Progress Menuju Level Berikutnya (${progressPercentage}%)`, 
+                    value: `\`[${visualBar}]\`\n⚡ **${userXp.toLocaleString()} / ${xpNeeded.toLocaleString()} XP**` 
+                }
+            )
+            .setTimestamp()
+            .setFooter({ text: 'Hogwarts Academy Magic System', iconURL: client.user.displayAvatarURL() });
 
-        await message.channel.send(`\`\`\`text\n${profileDisplay}\n\`\`\``);
+        await message.channel.send({ embeds: [profileEmbed] });
         return;
     }
 
@@ -310,7 +306,6 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     if (command === '!sortinghat') {
-        // DIBATASI: Sorting Hat kini hanya bisa dipanggil oleh Lord of Magic (Owner)
         if (userId !== OWNER_ID) {
             return message.reply('❌ Hanya Lord of Magic yang berhak memanggil The Sorting Hat!');
         }
@@ -338,7 +333,6 @@ client.on(Events.MessageCreate, async (message) => {
 
             if (db.users[userId].level >= 1000) return;
 
-            // Penambahan 15 EXP Flat per chat valid
             const xpGained = 15;
             db.users[userId].xp += xpGained;
 
@@ -351,7 +345,6 @@ client.on(Events.MessageCreate, async (message) => {
             let levelUpOccurred = false;
             let reachedLevelCheckpoint = false;
 
-            // Logika loop naik level kelipatan 5
             while (db.users[userId].xp >= xpNeeded) {
                 db.users[userId].xp -= xpNeeded; 
                 db.users[userId].level += 1; 
@@ -369,7 +362,6 @@ client.on(Events.MessageCreate, async (message) => {
                 }
             }
 
-            // Notifikasi level up di-trigger kelipatan 5
             if (levelUpOccurred && reachedLevelCheckpoint) {
                 const newTitle = getWizardTitle(db.users[userId].level, userId);
                 const levelUpEmbed = new EmbedBuilder()
@@ -384,7 +376,7 @@ client.on(Events.MessageCreate, async (message) => {
             saveDbData(db);
             
             xpCooldowns.add(userId);
-            setTimeout(() => xpCooldowns.delete(userId), 60000); // Cooldown 1 menit agar tidak spam chat
+            setTimeout(() => xpCooldowns.delete(userId), 60000);
 
         } catch (err) {
             console.error('Masalah saat memproses XP Chat:', err);
