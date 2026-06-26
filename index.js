@@ -263,27 +263,27 @@ client.on(Events.MessageCreate, async (message) => {
         const targetHouse = houses.find(h => targetMember.roles.cache.has(h.id));
         const houseName = targetHouse ? `${targetHouse.emoji} ${targetHouse.name}` : 'Belum Masuk Asrama';
 
-        // Total lebar kotak diset 38 karakter agar ramping dan proporsional di HP
-        const totalBars = 16;
+        // Kotak diperkecil (lebar total hanya 30 karakter) agar sangat pas dan tidak melebar di layar HP
+        const totalBars = 10;
         const percentage = xpNeeded > 0 ? Math.min(userXp / xpNeeded, 1) : 1;
         const filledBars = Math.round(percentage * totalBars);
         const emptyBars = totalBars - filledBars;
         const progressBarText = '▓'.repeat(filledBars) + '░'.repeat(emptyBars);
 
         const profileDisplay = 
-`┌──────────────────────────────────────┐
-           ✨ WIZARD PROFILE ✨         
-├──────────────────────────────────────┤
-  Nama        :  ${targetUser.username}
-  Title       :  ${wizardTitle}
-  Asrama      :  ${houseName}
-  Level       :  ${userLevel}
-  Point       :  ${pointsContributed.toLocaleString()} Poin
-├──────────────────────────────────────┤
-  PROGRES NAIK LEVEL:
+`┌──────────────────────────────┐
+       ✨ WIZARD PROFILE ✨     
+├──────────────────────────────┤
+  🧙‍♂️ Nama   :  ${targetUser.username}
+  🏷️ Gelar   :  ${wizardTitle}
+  🏰 Asrama :  ${houseName}
+  ⭐ Level  :  ${userLevel}
+  🏆 Poin   :  ${pointsContributed.toLocaleString()}
+├──────────────────────────────┤
+  📈 PROGRES NAIK LEVEL:
   [${progressBarText}]
   ⚡ ${userXp.toLocaleString()} / ${xpNeeded.toLocaleString()} XP
-└──────────────────────────────────────┘`;
+└──────────────────────────────┘`;
 
         await message.channel.send(`\`\`\`text\n${profileDisplay}\n\`\`\``);
         return;
