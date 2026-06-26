@@ -28,7 +28,6 @@ const client = new Client({
 const OWNER_ID = '1180180812327559310'; 
 const LEVEL_UP_CHANNEL_ID = '1475801714425860272'; 
 
-// Catatan ID Role Kelas/Asrama untuk pengecekan akses command
 const HOUSES_DATA = [
     { id: '1475605712938864796', name: 'Gryffindor', emoji: '🦁', command: 'gryffindor' },
     { id: '1475786100210401413', name: 'Slytherin', emoji: '🐍', command: 'slytherin' },
@@ -36,8 +35,8 @@ const HOUSES_DATA = [
     { id: '1475787032759631965', name: 'Hufflepuff', emoji: '🦡', command: 'hufflepuff' }
 ];
 
-// PENTING: Database diarahkan ke /tmp/ agar saat bot update/restart level tidak reset
-const dataPath = path.join('/tmp', 'users_hogwarts.json');
+// MENGEMBALIKAN FOLDER PENYIMPANAN KE ROOT DIRECTORY LOKAL (Agar tidak terhapus saat re-deploy Railway)
+const dataPath = path.join(__dirname, 'users.json');
 
 function getDbData() {
     if (!fs.existsSync(dataPath)) {
@@ -160,7 +159,6 @@ client.once(Events.ClientReady, () => {
 });
 
 client.on(Events.GuildMemberRemove, (member) => {
-    // Opsional jika tetap ingin data user dihapus dari database saat keluar server
     let db = getDbData();
     if (db.users[member.id]) {
         delete db.users[member.id];
@@ -182,8 +180,6 @@ client.on(Events.MessageCreate, async (message) => {
     const levelUpChannel = message.guild.channels.cache.get(LEVEL_UP_CHANNEL_ID) || message.channel;
     const userHouseObj = HOUSES_DATA.find(h => message.member.roles.cache.has(h.id));
 
-    // Pengecekan Akses Umum: Memastikan command hanya bisa dipakai yang sudah punya role kelas/asrama
-    // Pengecualian: Owner/Lord of Magic (!setlevel, !givepoint, !sortinghat) tetap bisa akses
     const isOwner = userId === OWNER_ID;
     const isSorted = !!userHouseObj;
 
@@ -338,12 +334,11 @@ client.on(Events.MessageCreate, async (message) => {
         return message.channel.send({ embeds: [lbEmbed] });
     }
 
-    // FITUR TAMBAHAN: Roster Anggota Asrama (Tanpa Tag/Ping)
+    // FITUR TAMBAHAN: Roster Anggota Asrama (Display Name + Emotikon Sihir rapi tanpa tag/ping)
     const targetHouseRoster = HOUSES_DATA.find(h => `!roster${h.command}` === command);
     if (targetHouseRoster) {
-        await message.guild.members.fetch(); // Memastikan cache member ter-update
+        await message.guild.members.fetch(); 
 
-        // Filter member yang memiliki role asrama tersebut
         const membersInHouse = message.guild.members.cache.filter(member => 
             member.roles.cache.has(targetHouseRoster.id) && !member.user.bot
         );
@@ -353,11 +348,9 @@ client.on(Events.MessageCreate, async (message) => {
         if (membersInHouse.size === 0) {
             rosterDescription += '*(Belum ada penyihir yang masuk asrama ini)*';
         } else {
-            // Cukup munculkan display name dan avatar
             const listDisplay = membersInHouse.map(member => {
                 const displayName = member.displayName;
-                const avatarURL = member.user.displayAvatarURL({ dynamic: true, size: 32 });
-                return `🖼️ [Avatar](${avatarURL})  |  🪄 **${displayName}**`;
+                return `✨ 🪄 **${displayName}** 🔮`;
             }).join('\n');
             
             rosterDescription += listDisplay;
