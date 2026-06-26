@@ -28,6 +28,7 @@ const client = new Client({
 // ==========================================
 const OWNER_ID = '1180180812327559310'; 
 const LEVEL_UP_CHANNEL_ID = '1475801714425860272'; 
+const EMBED_COLOR = '#25a5cf'; // Kode warna embed konsisten
 
 const HOUSES_DATA = [
     { id: '1475605712938864796', name: 'Gryffindor', emoji: '🦁', command: 'gryffindor' },
@@ -100,7 +101,7 @@ client.once(Events.ClientReady, () => {
                     if (voiceState.channelId && !voiceState.member.user.bot && userId !== OWNER_ID) {
                         let userDoc = await User.findOne({ userId, guildId: guild.id });
                         if (!userDoc) {
-                            userDoc = new User({ userId, guildId: guild.id, xp: 0, level: 1 });
+                            userDoc = new User({ userId, guildId: guild.id, xp: 0, level: 1, galleons: 0 });
                         }
 
                         if (userDoc.level >= 1000) return;
@@ -141,7 +142,7 @@ client.once(Events.ClientReady, () => {
                             
                             if (levelUpChannel) {
                                 const levelUpEmbed = new EmbedBuilder()
-                                    .setColor('#25a5cf') 
+                                    .setColor(EMBED_COLOR) 
                                     .setTitle('✨ Hogwarts Academy Milestone!')
                                     .setDescription(`Selamat! <@${userId}> telah mencapai **Level ${userDoc.level}** dan kini bergelar **${newTitle}**! 🎓 Pencapaian yang luar biasa!`)
                                     .setTimestamp();
@@ -194,7 +195,7 @@ client.on(Events.MessageCreate, async (message) => {
 
         let userDoc = await User.findOne({ userId: targetUser.id, guildId: message.guild.id });
         if (!userDoc) {
-            userDoc = new User({ userId: targetUser.id, guildId: message.guild.id, xp: 0, level: 1 });
+            userDoc = new User({ userId: targetUser.id, guildId: message.guild.id, xp: 0, level: 1, galleons: 0 });
         }
 
         userDoc.level = Math.min(newLevel, 1000); 
@@ -223,7 +224,7 @@ client.on(Events.MessageCreate, async (message) => {
     if (command === '!levelup') {
         if (!isOwner) return message.reply('❌ Perintah ini khusus untuk Lord of Magic!');
         const testEmbed = new EmbedBuilder()
-            .setColor('#25a5cf')
+            .setColor(EMBED_COLOR)
             .setTitle('✨ Hogwarts Academy Level Up!')
             .setDescription(`Selamat! ${message.author} telah naik level! 🎓`)
             .setTimestamp();
@@ -236,7 +237,7 @@ client.on(Events.MessageCreate, async (message) => {
         if (!isOwner) return message.reply('❌ Hanya Lord of Magic yang berhak memanggil The Sorting Hat!');
 
         const embed = new EmbedBuilder()
-            .setColor('#25a5cf') 
+            .setColor(EMBED_COLOR) 
             .setTitle('🎩 The Sorting Hat')
             .setDescription('Welcome to **Hogwarts Academy**\n\nSilahkan tekan tombol di bawah dan biarkan Sorting Hat menentukan kelasmu!');
 
@@ -250,12 +251,221 @@ client.on(Events.MessageCreate, async (message) => {
 
     // Blokir command umum jika belum mendapat role kelas asrama
     if (!isSorted && !isOwner) {
-        if (['!profile', '!leaderboard', '!student'].some(cmd => command.startsWith(cmd))) {
-            return message.reply('❌ **Akses Ditolak!** Perintah ini hanya boleh digunakan oleh murid yang sudah memiliki Role Asrama / Kelas (Lewat The Sorting Hat). Silakan hubungi Lord of Magic!');
+        if (['!profile', '!leaderboard', '!student', '!absen', '!cash', '!send'].some(cmd => command.startsWith(cmd))) {
+            const blockedEmbed = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('❌ Akses Ditolak!')
+                .setDescription('Perintah ini hanya boleh digunakan oleh murid yang sudah memiliki Role Asrama / Kelas (Lewat The Sorting Hat). Silakan hubungi Lord of Magic!')
+                .setTimestamp();
+            return message.channel.send({ embeds: [blockedEmbed] });
         }
     }
 
-    // B. GENERAL MAGICAL COMMANDS
+    // B. CURRENCY SYSTEM (Absen, Cash, Send)
+    if (command === '!absen') {
+        try {
+            let userDoc = await User.findOne({ userId, guildId: message.guild.id });
+            if (!userDoc) {
+                userDoc = new User({ userId, guildId: message.guild.id, xp: 0, level: 1, galleons: 0 });
+            }
+
+            // Cooldown 24 jam (dalam milidetik)
+            const cooldownTime = 24 * 60 * 60 * 1000; 
+            if (userDoc.lastAbsen && (Date.now() - userDoc.lastAbsen.getTime()) < cooldownTime) {
+                const remainingTime = cooldownTime - (Date.now() - userDoc.lastAbsen.getTime());
+                const hours = Math.floor(remainingTime / (60 * 60 * 1000));
+                const minutes = Math.floor((remainingTime % (60 * 60 * 1000)) / (60 * 1000));
+                
+                const waitEmbed = new EmbedBuilder()
+                    .setColor(EMBED_COLOR)
+                    .setTitle('⏳ Batas Waktu Absen')
+                    .setDescription(`Tunggu **${hours} jam ${minutes} menit** lagi sebelum bisa mengambil tunjangan harianmu kembali!`)
+                    .setTimestamp();
+                return message.channel.send({ embeds: [waitEmbed] });
+            }
+
+            // Fungsi RNG (Random Number Generator) peluang kecil
+            function getAbsenXp() {
+                const rand = Math.random();
+                if (rand < 0.75) {
+                    // 75% chance untuk angka kecil 1 - 20
+                    return Math.floor(Math.random() * 20) + 1;
+                } else {
+                    // 25% chance peluang lebih kecil untuk angka 21 - 50
+                    return Math.floor(Math.random() * 30) + 21;
+                }
+            }
+
+            function getAbsenGalleons() {
+                const rand = Math.random();
+                if (rand < 0.75) {
+                    // 75% chance untuk 400 - 1200
+                    return Math.floor(Math.random() * 801) + 400;
+                } else {
+                    // 25% chance peluang lebih kecil untuk 1201 - 2000
+                    return Math.floor(Math.random() * 800) + 1201;
+                }
+            }
+
+            const xpGained = getAbsenXp();
+            const galleonsGained = getAbsenGalleons();
+
+            userDoc.xp += xpGained;
+            userDoc.galleons = (userDoc.galleons || 0) + galleonsGained;
+            userDoc.lastAbsen = new Date(); // Update cooldown waktu absen
+
+            // Leveling Check
+            let xpNeeded = getXpNeededForNextLevel(userDoc.level);
+            let levelUpOccurred = false;
+
+            while (userDoc.xp >= xpNeeded) {
+                userDoc.xp -= xpNeeded;
+                userDoc.level += 1;
+                xpNeeded = getXpNeededForNextLevel(userDoc.level);
+                levelUpOccurred = true;
+                if (userDoc.level >= 1000) {
+                    userDoc.level = 1000;
+                    userDoc.xp = 0;
+                    break;
+                }
+            }
+
+            await userDoc.save();
+
+            let descText = `Absen harian berhasil! Kamu mendapatkan tunjangan sihir:\n\n⭐ **+${xpGained} XP**\n🪙 **+${galleonsGained.toLocaleString()} Galleons**`;
+            if (levelUpOccurred) {
+                descText += `\n\n🎉 Selamat, tingkat sihirmu naik ke **Level ${userDoc.level}**!`;
+            }
+
+            const absenEmbed = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('📜 Absen Harian Akademik')
+                .setDescription(descText)
+                .setTimestamp();
+            return message.channel.send({ embeds: [absenEmbed] });
+
+        } catch (err) {
+            console.error('Error saat memproses !absen:', err);
+        }
+    }
+
+    if (command === '!cash') {
+        let userDoc = await User.findOne({ userId, guildId: message.guild.id });
+        if (!userDoc) {
+            userDoc = new User({ userId, guildId: message.guild.id, xp: 0, level: 1, galleons: 0 });
+            await userDoc.save();
+        }
+
+        const cashEmbed = new EmbedBuilder()
+            .setColor(EMBED_COLOR)
+            .setTitle(`💰 Dompet Sihir — ${message.author.username.toUpperCase()}`)
+            .setDescription(`Saldo tabunganmu saat ini adalah:\n\n🪙 **${(userDoc.galleons || 0).toLocaleString()} Galleons**`)
+            .setTimestamp();
+        return message.channel.send({ embeds: [cashEmbed] });
+    }
+
+    if (command === '!send') {
+        const targetUser = message.mentions.users.first();
+        const sendAmount = parseInt(args[2]);
+
+        if (!targetUser || isNaN(sendAmount) || sendAmount <= 0) {
+            const formatSendEmbed = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🔮 Format Pengiriman Galleon Salah')
+                .setDescription('Gunakan format yang benar:\n`!send @User <jumlah_galleon>`\n*(Contoh: `!send @Harry 50`)*')
+                .setTimestamp();
+            return message.channel.send({ embeds: [formatSendEmbed] });
+        }
+
+        if (targetUser.bot) {
+            const botSendEmbed = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('❌ Transaksi Ditolak')
+                .setDescription('Kamu tidak bisa mengirim Galleon kepada bot sihir!')
+                .setTimestamp();
+            return message.channel.send({ embeds: [botSendEmbed] });
+        }
+
+        if (targetUser.id === userId) {
+            const selfSendEmbed = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('❌ Transaksi Ditolak')
+                .setDescription('Kamu tidak bisa mengirim Galleon kepada diri sendiri!')
+                .setTimestamp();
+            return message.channel.send({ embeds: [selfSendEmbed] });
+        }
+
+        let senderDoc = await User.findOne({ userId, guildId: message.guild.id });
+        if (!senderDoc || (senderDoc.galleons || 0) < sendAmount) {
+            const poorEmbed = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🪙 Saldo Tidak Cukup')
+                .setDescription(`Tabungan Galleon kamu tidak mencukupi untuk melakukan transaksi sebesar **${sendAmount.toLocaleString()} G**.\nSaldo saat ini: **${(senderDoc ? senderDoc.galleons : 0).toLocaleString()} G**`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [poorEmbed] });
+        }
+
+        // Tombol Konfirmasi Verifikasi (Hijau / Merah)
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('confirm_send').setLabel('Confirm').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId('cancel_send').setLabel('Cancel').setStyle(ButtonStyle.Danger)
+        );
+
+        const verifyEmbed = new EmbedBuilder()
+            .setColor(EMBED_COLOR)
+            .setTitle('⚖️ Verifikasi Pengiriman Galleon')
+            .setDescription(`Apakah kamu yakin ingin mengirim **${sendAmount.toLocaleString()} Galleons** kepada ${targetUser}?`)
+            .setTimestamp();
+
+        const verifyMsg = await message.channel.send({ embeds: [verifyEmbed], components: [row] });
+
+        const filter = i => i.user.id === userId; // Hanya command sender yang bisa klik tombol
+        const collector = verifyMsg.createMessageComponentCollector({ filter, time: 30000 });
+
+        collector.on('collect', async i => {
+            if (i.customId === 'confirm_send') {
+                // Tarik Saldo Pengirim
+                senderDoc.galleons -= sendAmount;
+                await senderDoc.save();
+
+                // Beri Saldo Penerima
+                let receiverDoc = await User.findOne({ userId: targetUser.id, guildId: message.guild.id });
+                if (!receiverDoc) {
+                    receiverDoc = new User({ userId: targetUser.id, guildId: message.guild.id, xp: 0, level: 1, galleons: 0 });
+                }
+                receiverDoc.galleons = (receiverDoc.galleons || 0) + sendAmount;
+                await receiverDoc.save();
+
+                const successEmbed = new EmbedBuilder()
+                    .setColor(EMBED_COLOR)
+                    .setTitle('✅ Transaksi Berhasil')
+                    .setDescription(`Berhasil mengirim **${sendAmount.toLocaleString()} Galleons** kepada ${targetUser}!`)
+                    .setTimestamp();
+                await i.update({ embeds: [successEmbed], components: [] });
+            } else if (i.customId === 'cancel_send') {
+                const cancelEmbed = new EmbedBuilder()
+                    .setColor(EMBED_COLOR)
+                    .setTitle('❌ Transaksi Dibatalkan')
+                    .setDescription('Pengiriman Galleons dibatalkan oleh pengirim.')
+                    .setTimestamp();
+                await i.update({ embeds: [cancelEmbed], components: [] });
+            }
+        });
+
+        collector.on('end', collected => {
+            if (collected.size === 0) {
+                const timeoutEmbed = new EmbedBuilder()
+                    .setColor(EMBED_COLOR)
+                    .setTitle('⏰ Waktu Verifikasi Habis')
+                    .setDescription('Verifikasi transaksi pengiriman Galleons telah kedaluwarsa.')
+                    .setTimestamp();
+                verifyMsg.edit({ embeds: [timeoutEmbed], components: [] }).catch(console.error);
+            }
+        });
+        return;
+    }
+
+    // C. GENERAL MAGICAL COMMANDS
     if (command === '!profile') {
         const targetUser = message.mentions.users.first() || message.author;
         const targetMember = message.guild.members.cache.get(targetUser.id);
@@ -266,16 +476,18 @@ client.on(Events.MessageCreate, async (message) => {
 
         let userLevel, userXp, xpNeeded, wizardTitle;
         let pointsContributed = 0; 
+        let userGalleons = 0;
 
         if (targetUser.id === OWNER_ID) {
             userLevel = 9999;
             userXp = 0; 
             xpNeeded = getXpNeededForNextLevel(userLevel); 
             wizardTitle = 'Lord of Magic';
+            userGalleons = 999999;
         } else {
             let userDoc = await User.findOne({ userId: targetUser.id, guildId: message.guild.id });
             if (!userDoc) {
-                userDoc = new User({ userId: targetUser.id, guildId: message.guild.id, xp: 0, level: 1 });
+                userDoc = new User({ userId: targetUser.id, guildId: message.guild.id, xp: 0, level: 1, galleons: 0 });
                 await userDoc.save();
             }
             
@@ -283,10 +495,11 @@ client.on(Events.MessageCreate, async (message) => {
             userXp = userDoc.xp;
             xpNeeded = getXpNeededForNextLevel(userLevel);
             wizardTitle = getWizardTitle(userLevel, targetUser.id);
+            userGalleons = userDoc.galleons || 0;
         }
         
         const targetHouse = HOUSES_DATA.find(h => targetMember.roles.cache.has(h.id));
-        const houseName = targetHouse ? `${targetHouse.emoji} ${targetHouse.name}` : 'Belum Masuk Asrama';
+        const houseName = targetHouse ? `${targetHouse.emoji} \`${targetHouse.name}\`` : 'Belum Masuk Asrama';
 
         const progressPercentage = targetUser.id === OWNER_ID ? 100 : Math.min(Math.floor((userXp / xpNeeded) * 100), 100);
         
@@ -296,7 +509,7 @@ client.on(Events.MessageCreate, async (message) => {
         const visualBar = '▓'.repeat(filledBlocks) + '░'.repeat(emptyBlocks);
 
         const profileEmbed = new EmbedBuilder()
-            .setColor('#25a5cf')
+            .setColor(EMBED_COLOR)
             .setAuthor({ 
                 name: `✨ WIZARD PROFILE — ${targetUser.username.toUpperCase()} ✨`, 
                 iconURL: targetUser.displayAvatarURL({ dynamic: true }) 
@@ -308,6 +521,7 @@ client.on(Events.MessageCreate, async (message) => {
                 { name: '🏰 Asrama Hogwarts', value: `${houseName}`, inline: true },
                 { name: '⭐ Level Saat Ini', value: `\`${userLevel}\``, inline: true },
                 { name: '🏆 Poin Kontribusi', value: `\`${pointsContributed.toLocaleString()} Poin\``, inline: true },
+                { name: '🪙 Saldo Tabungan', value: `\`${userGalleons.toLocaleString()} Galleons\``, inline: true },
                 { name: '\u200B', value: '\u200B' }, 
                 { 
                     name: `📈 Progress Menuju Level Berikutnya (${progressPercentage}%)`, 
@@ -325,7 +539,7 @@ client.on(Events.MessageCreate, async (message) => {
         const sortedHouses = Object.entries(housePointsCache).sort((a, b) => b[1] - a[1]);
 
         const lbEmbed = new EmbedBuilder()
-            .setColor('#25a5cf') 
+            .setColor(EMBED_COLOR) 
             .setTitle('🏆 House Cup Tournament - Leaderboard')
             .setDescription('Klasemen asrama Hogwarts saat ini:\n\n' + sortedHouses.map((house, index) => {
                 const houseMeta = HOUSES_DATA.find(h => h.name === house[0]);
@@ -342,7 +556,7 @@ client.on(Events.MessageCreate, async (message) => {
         await message.guild.members.fetch();
 
         const embed = new EmbedBuilder()
-            .setColor('#25a5cf')
+            .setColor(EMBED_COLOR)
             .setTitle('🎓 Hogwarts Academy Student Roster')
             .setDescription('Daftar seluruh murid aktif yang telah dikelompokkan ke asrama masing-masing.')
             .setTimestamp()
@@ -360,7 +574,6 @@ client.on(Events.MessageCreate, async (message) => {
                 let counter = 1;
                 houseList = membersInHouse.map(member => {
                     const name = member.displayName;
-                    // Mengganti angka dengan emot asrama di sebelah kiri nama
                     const item = `${house.emoji} **${name}**`;
                     counter++;
                     return item;
@@ -383,7 +596,7 @@ client.on(Events.MessageCreate, async (message) => {
         try {
             let userDoc = await User.findOne({ userId, guildId: message.guild.id });
             if (!userDoc) {
-                userDoc = new User({ userId, guildId: message.guild.id, xp: 0, level: 1 });
+                userDoc = new User({ userId, guildId: message.guild.id, xp: 0, level: 1, galleons: 0 });
             }
 
             if (userDoc.level >= 1000) return;
@@ -419,7 +632,7 @@ client.on(Events.MessageCreate, async (message) => {
             if (levelUpOccurred && reachedLevelCheckpoint) {
                 const newTitle = getWizardTitle(userDoc.level, userId);
                 const levelUpEmbed = new EmbedBuilder()
-                    .setColor('#25a5cf') 
+                    .setColor(EMBED_COLOR) 
                     .setTitle('✨ Hogwarts Academy Milestone!')
                     .setDescription(`Selamat! <@${userId}> telah mencapai **Level ${userDoc.level}** dan kini bergelar **${newTitle}**! 🎓 Pencapaian yang luar biasa!`)
                     .setTimestamp();
