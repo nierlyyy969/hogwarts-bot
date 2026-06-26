@@ -337,7 +337,7 @@ client.on(Events.MessageCreate, async (message) => {
         return message.channel.send({ embeds: [lbEmbed] });
     }
 
-    // C. ROSTER TERPADU !student (Format Sub-judul Besar Rapi)
+    // C. ROSTER TERPADU !student (Pemisah Garis Estetik & Emot Sesuai Asrama)
     if (command === '!student') {
         await message.guild.members.fetch();
 
@@ -355,21 +355,21 @@ client.on(Events.MessageCreate, async (message) => {
 
             let houseList = '';
             if (membersInHouse.size === 0) {
-                houseList = '*(Belum ada murid)*';
+                houseList = '*(Belum ada murid di asrama ini)*';
             } else {
                 let counter = 1;
                 houseList = membersInHouse.map(member => {
                     const name = member.displayName;
-                    const item = `${counter}. **${name}**`;
+                    // Mengganti angka dengan emot asrama di sebelah kiri nama
+                    const item = `${house.emoji} **${name}**`;
                     counter++;
                     return item;
                 }).join('\n');
             }
 
-            // Judul asrama dijadikan sub-title besar (Markdown ##) di dalam value
             embed.addFields({
                 name: '\u200B',
-                value: `## ${house.emoji} ${house.name} (${membersInHouse.size} Murid)\n${houseList}`,
+                value: `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n${house.emoji} **${house.name.toUpperCase()}** (${membersInHouse.size} Murid)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n${houseList}`,
                 inline: false
             });
         }
