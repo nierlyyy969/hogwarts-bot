@@ -340,7 +340,7 @@ client.on(Events.MessageCreate, async (message) => {
         return message.channel.send({ embeds: [lbEmbed] });
     }
 
-    // FITUR TAMBAHAN: Roster Anggota Asrama (Hanya Display Name & Emotikon Sihir rapi)
+    // FITUR TAMBAHAN: Roster Anggota Asrama (Hanya Nomor dan Display Name murni)
     const targetHouseRoster = HOUSES_DATA.find(h => `!roster${h.command}` === command);
     if (targetHouseRoster) {
         await message.guild.members.fetch(); 
@@ -354,9 +354,12 @@ client.on(Events.MessageCreate, async (message) => {
         if (membersInHouse.size === 0) {
             rosterDescription += '*(Belum ada penyihir yang masuk asrama ini)*';
         } else {
+            let counter = 1;
             const listDisplay = membersInHouse.map(member => {
                 const displayName = member.displayName;
-                return `✨ 🪄 **${displayName}** 🔮`;
+                const formattedItem = `${counter}. **${displayName}**`;
+                counter++;
+                return formattedItem;
             }).join('\n');
             
             rosterDescription += listDisplay;
