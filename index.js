@@ -53,6 +53,9 @@ function getWizardTitle(level) {
 const xpCooldowns = new Set();
 const LEVEL_UP_CHANNEL_ID = '1475801714425860272'; 
 
+// Link Gambar GIF Hogwarts untuk Level Up & Sorting Hat
+const HOGWARTS_GIF = 'https://cdn.discordapp.com/attachments/1502882871612805283/1502886909570060339/-4.gif?ex=6a3ea5c1&is=6a3d5441&hm=c230bca22b037a6bdd70b38daeddd5f2f42302ad62a08939374aeb8b22279f07&';
+
 // Pengaturan Rumah Asrama (Sorting Hat)
 const houses = [
     { id: '1475605712938864796', name: '🦁 Gryffindor' },
@@ -75,13 +78,20 @@ client.on(Events.MessageCreate, async (message) => {
     // 1. PERINTAH TES INSTAN (!levelup)
     if (message.content === '!levelup') {
         const targetChannel = message.guild.channels.cache.get(LEVEL_UP_CHANNEL_ID) || message.channel;
-        
-        targetChannel.send(`✨ **Selamat!** ${message.author} telah naik ke **Level 2** dan sekarang bergelar **🌱 First Year**! 🎓`);
-        
+
+        const testEmbed = new EmbedBuilder()
+            .setColor('#25a5cf')
+            .setTitle('✨ Hogwarts Academy Level Up!')
+            .setDescription(`Selamat! ${message.author} telah naik ke **Level 2** dan sekarang bergelar **🌱 First Year**! 🎓`)
+            .setImage(HOGWARTS_GIF)
+            .setTimestamp();
+
+        await targetChannel.send({ embeds: [testEmbed] });
+
         if (targetChannel.id !== message.channel.id) {
             message.reply('✅ Pesan simulasi level-up telah dikirim ke channel khusus!');
         }
-        return; // Hentikan eksekusi kode di bawah agar tidak menambah XP dobel saat tes
+        return; 
     }
 
     // 2. PERINTAH SORTING HAT (!sortinghat)
@@ -92,7 +102,7 @@ client.on(Events.MessageCreate, async (message) => {
             .setDescription('Welcome to **Hogwarts Academy**\n\nSilahkan tekan tombol di bawah dan biarkan Sorting Hat menentukan kelasmu!')
             .setFooter({ text: 'Hogwarts Academy • House Selection' })
             .setTimestamp()
-            .setImage('https://cdn.discordapp.com/attachments/1502882871612805283/1502886909570060339/-4.gif?ex=6a3dfd01&is=6a3cab81&hm=f39de21ab9f12324d2322953b00b22a4c3e5ec4d13ceeb8ecc03ef5e5f89a591&');
+            .setImage(HOGWARTS_GIF);
 
         const row = new ActionRowBuilder()
             .addComponents(
@@ -132,13 +142,17 @@ client.on(Events.MessageCreate, async (message) => {
                 db[userId].level += 1; // Level Naik
 
                 const newTitle = getWizardTitle(db[userId].level);
-                const levelUpChannel = message.guild.channels.cache.get(LEVEL_UP_CHANNEL_ID);
+                const levelUpChannel = message.guild.channels.cache.get(LEVEL_UP_CHANNEL_ID) || message.channel;
 
-                if (levelUpChannel) {
-                    levelUpChannel.send(`✨ **Selamat!** <@${userId}> telah naik ke **Level ${db[userId].level}** dan sekarang bergelar **${newTitle}**! 🎓`);
-                } else {
-                    message.channel.send(`✨ **Selamat!** <@${userId}> telah naik ke **Level ${db[userId].level}** dan sekarang bergelar **${newTitle}**! 🎓`);
-                }
+                // EMBED UTK KELAS UP OTOMATIS MEMBER REALTIME
+                const levelUpEmbed = new EmbedBuilder()
+                    .setColor('#25a5cf')
+                    .setTitle('✨ Hogwarts Academy Level Up!')
+                    .setDescription(`Selamat! <@${userId}> telah naik ke **Level ${db[userId].level}** dan sekarang bergelar **${newTitle}**! 🎓`)
+                    .setImage(HOGWARTS_GIF)
+                    .setTimestamp();
+
+                await levelUpChannel.send({ embeds: [levelUpEmbed] });
             }
 
             // Simpan perubahan ke file lokal users.json
