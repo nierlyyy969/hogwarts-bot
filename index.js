@@ -337,7 +337,7 @@ client.on(Events.MessageCreate, async (message) => {
         return message.channel.send({ embeds: [lbEmbed] });
     }
 
-    // C. ROSTER TERPADU !student (Dengan Heading Markdown ##)
+    // C. ROSTER TERPADU !student (Format Sub-judul Besar Rapi)
     if (command === '!student') {
         await message.guild.members.fetch();
 
@@ -366,9 +366,10 @@ client.on(Events.MessageCreate, async (message) => {
                 }).join('\n');
             }
 
+            // Judul asrama dijadikan sub-title besar (Markdown ##) di dalam value
             embed.addFields({
-                name: `## ${house.emoji} ${house.name} (${membersInHouse.size} Murid)`,
-                value: houseList,
+                name: '\u200B',
+                value: `## ${house.emoji} ${house.name} (${membersInHouse.size} Murid)\n${houseList}`,
                 inline: false
             });
         }
