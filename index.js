@@ -251,7 +251,7 @@ client.on(Events.MessageCreate, async (message) => {
 
     // Blokir command umum jika belum mendapat role kelas asrama
     if (!isSorted && !isOwner) {
-        if (['!profile', '!leaderboard', '!student', '!absen', '!cash', '!send'].some(cmd => command.startsWith(cmd))) {
+        if (['!profile', '!leaderboard', '!student', '!absen', '!cash', '!send', '!toss', '!slot'].some(cmd => command.startsWith(cmd))) {
             const blockedEmbed = new EmbedBuilder()
                 .setColor(EMBED_COLOR)
                 .setTitle('❌ Akses Ditolak!')
@@ -261,7 +261,7 @@ client.on(Events.MessageCreate, async (message) => {
         }
     }
 
-    // B. CURRENCY SYSTEM (Absen, Cash, Send)
+    // B. CURRENCY SYSTEM (Absen, Cash, Send, Mini-Games)
     if (command === '!absen') {
         try {
             let userDoc = await User.findOne({ userId, guildId: message.guild.id });
@@ -269,7 +269,6 @@ client.on(Events.MessageCreate, async (message) => {
                 userDoc = new User({ userId, guildId: message.guild.id, xp: 0, level: 1, galleons: 0 });
             }
 
-            // Cooldown 24 jam (dalam milidetik)
             const cooldownTime = 24 * 60 * 60 * 1000; 
             if (userDoc.lastAbsen && (Date.now() - userDoc.lastAbsen.getTime()) < cooldownTime) {
                 const remainingTime = cooldownTime - (Date.now() - userDoc.lastAbsen.getTime());
@@ -284,14 +283,11 @@ client.on(Events.MessageCreate, async (message) => {
                 return message.channel.send({ embeds: [waitEmbed] });
             }
 
-            // Fungsi RNG (Random Number Generator) peluang kecil
             function getAbsenXp() {
                 const rand = Math.random();
                 if (rand < 0.75) {
-                    // 75% chance untuk angka kecil 1 - 20
                     return Math.floor(Math.random() * 20) + 1;
                 } else {
-                    // 25% chance peluang lebih kecil untuk angka 21 - 50
                     return Math.floor(Math.random() * 30) + 21;
                 }
             }
@@ -299,10 +295,8 @@ client.on(Events.MessageCreate, async (message) => {
             function getAbsenGalleons() {
                 const rand = Math.random();
                 if (rand < 0.75) {
-                    // 75% chance untuk 400 - 1200
                     return Math.floor(Math.random() * 801) + 400;
                 } else {
-                    // 25% chance peluang lebih kecil untuk 1201 - 2000
                     return Math.floor(Math.random() * 800) + 1201;
                 }
             }
@@ -312,9 +306,8 @@ client.on(Events.MessageCreate, async (message) => {
 
             userDoc.xp += xpGained;
             userDoc.galleons = (userDoc.galleons || 0) + galleonsGained;
-            userDoc.lastAbsen = new Date(); // Update cooldown waktu absen
+            userDoc.lastAbsen = new Date();
 
-            // Leveling Check
             let xpNeeded = getXpNeededForNextLevel(userDoc.level);
             let levelUpOccurred = false;
 
@@ -359,7 +352,7 @@ client.on(Events.MessageCreate, async (message) => {
         const cashEmbed = new EmbedBuilder()
             .setColor(EMBED_COLOR)
             .setTitle(`💰 Dompet Sihir — ${message.author.username.toUpperCase()}`)
-            .setDescription(`Saldo tabunganmu saat ini adalah:\n\n🪙 **${(userDoc.galleons || 0).toLocaleString()} Galleons**`)
+            .setDescription(`Saldo tabunganmu saat ini adalah:\n\n🪙 **${(userDoc.galleons || 0).toLocaleString()} Galleons**\n\n🏰 Pundi-pundi Asrama: **${(userDoc.houseVault || 0).toLocaleString()} G**`)
             .setTimestamp();
         return message.channel.send({ embeds: [cashEmbed] });
     }
@@ -405,7 +398,6 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [poorEmbed] });
         }
 
-        // Tombol Konfirmasi Verifikasi (Hijau / Merah)
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('confirm_send').setLabel('Confirm').setStyle(ButtonStyle.Success),
             new ButtonBuilder().setCustomId('cancel_send').setLabel('Cancel').setStyle(ButtonStyle.Danger)
@@ -419,16 +411,14 @@ client.on(Events.MessageCreate, async (message) => {
 
         const verifyMsg = await message.channel.send({ embeds: [verifyEmbed], components: [row] });
 
-        const filter = i => i.user.id === userId; // Hanya command sender yang bisa klik tombol
+        const filter = i => i.user.id === userId;
         const collector = verifyMsg.createMessageComponentCollector({ filter, time: 30000 });
 
         collector.on('collect', async i => {
             if (i.customId === 'confirm_send') {
-                // Tarik Saldo Pengirim
                 senderDoc.galleons -= sendAmount;
                 await senderDoc.save();
 
-                // Beri Saldo Penerima
                 let receiverDoc = await User.findOne({ userId: targetUser.id, guildId: message.guild.id });
                 if (!receiverDoc) {
                     receiverDoc = new User({ userId: targetUser.id, guildId: message.guild.id, xp: 0, level: 1, galleons: 0 });
@@ -465,6 +455,179 @@ client.on(Events.MessageCreate, async (message) => {
         return;
     }
 
+    // ==========================================
+    // MINI-GAMES CASINO SIHIR (Toss & Slot)
+    // ==========================================
+    if (command === '!toss') {
+        const betAmount = parseInt(args[1]);
+
+        if (isNaN(betAmount) || betAmount <= 0) {
+            const formatToss = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🔮 Format Coffin Toss Salah')
+                .setDescription('Gunakan format:\n`!toss <jumlah_galleon>`\n*(Contoh: `!toss 100`)*')
+                .setTimestamp();
+            return message.channel.send({ embeds: [formatToss] });
+        }
+
+        let userDoc = await User.findOne({ userId, guildId: message.guild.id });
+        if (!userDoc || (userDoc.galleons || 0) < betAmount) {
+            const poorToss = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🪙 Saldo Tidak Cukup')
+                .setDescription(`Tabungan Galleon kamu tidak mencukupi untuk bertaruh sebesar **${betAmount.toLocaleString()} G**.\nSaldo saat ini: **${(userDoc ? userDoc.galleons : 0).toLocaleString()} G**`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [poorToss] });
+        }
+
+        const tossRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('toss_snitch').setLabel('Snitch Emas').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId('toss_bludger').setLabel('Bludger').setStyle(ButtonStyle.Danger)
+        );
+
+        const tossEmbed = new EmbedBuilder()
+            .setColor(EMBED_COLOR)
+            .setTitle('🎲 Coffin Toss - Lempar Koin Naga')
+            .setDescription(`Taruhan: **${betAmount.toLocaleString()} Galleons**\n\nSilakan pilih sisi koin lemparanmu di bawah ini:`)
+            .setTimestamp();
+
+        const tossMsg = await message.channel.send({ embeds: [tossEmbed], components: [tossRow] });
+
+        const filter = i => i.user.id === userId;
+        const collector = tossMsg.createMessageComponentCollector({ filter, time: 30000 });
+
+        collector.on('collect', async i => {
+            const choices = ['snitch', 'bludger'];
+            const botChoice = choices[Math.floor(Math.random() * choices.length)];
+            
+            const playerPick = i.customId === 'toss_snitch' ? 'snitch' : 'bludger';
+            
+            let resultDesc = `Koin naga berputar...\nKoin mendarat pada sisi: **${botChoice === 'snitch' ? '🟡 Snitch Emas' : '🔴 Bludger'}**\n\n`;
+
+            if (playerPick === botChoice) {
+                userDoc.galleons += betAmount; // Menang x2 (modal kembali + untung setara)
+                await userDoc.save();
+                resultDesc += `🎉 **Kemenangan Hebat!** Tebakanmu tepat. Saldo Galleon bertambah **+${betAmount.toLocaleString()} G**!`;
+            } else {
+                userDoc.galleons -= betAmount; // Kalah (potong modal)
+                await userDoc.save();
+                resultDesc += `❌ **Sayang Sekali!** Tebakanmu meleset. Saldo Galleon terpotong **-${betAmount.toLocaleString()} G**!`;
+            }
+
+            const resultEmbed = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('✨ Hasil Coffin Toss Sihir')
+                .setDescription(resultDesc)
+                .setTimestamp();
+
+            await i.update({ embeds: [resultEmbed], components: [] });
+        });
+
+        collector.on('end', collected => {
+            if (collected.size === 0) {
+                const timeoutEmbed = new EmbedBuilder()
+                    .setColor(EMBED_COLOR)
+                    .setTitle('⏰ Waktu Taruhan Habis')
+                    .setDescription('Permainan Coffin Toss dibatalkan karena tidak ada respons pilihan.')
+                    .setTimestamp();
+                tossMsg.edit({ embeds: [timeoutEmbed], components: [] }).catch(console.error);
+            }
+        });
+        return;
+    }
+
+    if (command === '!slot') {
+        const betAmount = parseInt(args[1]);
+
+        if (isNaN(betAmount) || betAmount <= 0) {
+            const formatSlot = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🔮 Format Mesin Slot Salah')
+                .setDescription('Gunakan format:\n`!slot <jumlah_galleon>`\n*(Contoh: `!slot 50`)*')
+                .setTimestamp();
+            return message.channel.send({ embeds: [formatSlot] });
+        }
+
+        let userDoc = await User.findOne({ userId, guildId: message.guild.id });
+        if (!userDoc || (userDoc.galleons || 0) < betAmount) {
+            const poorSlot = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🪙 Saldo Tidak Cukup')
+                .setDescription(`Tabungan Galleon kamu tidak mencukupi untuk bermain slot sebesar **${betAmount.toLocaleString()} G**.\nSaldo saat ini: **${(userDoc ? userDoc.galleons : 0).toLocaleString()} G**`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [poorSlot] });
+        }
+
+        // Tampilan Animasi Rolling Awal
+        const slotEmbed = new EmbedBuilder()
+            .setColor(EMBED_COLOR)
+            .setTitle('🎰 Gringotts Vault - Mesin Slot Sihir')
+            .setDescription(`Taruhan: **${betAmount.toLocaleString()} Galleons**\n\n**[ 🏺 Kuali | 🧹 Sapu | 🎩 Topi ]**\n*Mantra gulungan mesin slot sedang berputar...* 🌀`)
+            .setTimestamp();
+
+        const slotMsg = await message.channel.send({ embeds: [slotEmbed] });
+
+        // Peluang / Probabilitas Mesin Slot Gringotts
+        const rollRng = Math.random();
+        let rolled1, rolled2, rolled3;
+        let multiplier = 0;
+
+        // Simulasi gulungan mesin berputar selama 2.5 detik
+        setTimeout(async () => {
+            if (rollRng < 0.75) {
+                // 75% Gagal (Gambar Beda Semua)
+                const items = ['🏺', '🧹', '🎩', '🪙'];
+                rolled1 = items[Math.floor(Math.random() * items.length)];
+                do { rolled2 = items[Math.floor(Math.random() * items.length)]; } while (rolled2 === rolled1);
+                do { rolled3 = items[Math.floor(Math.random() * items.length)]; } while (rolled3 === rolled1 || rolled3 === rolled2);
+                
+                userDoc.galleons -= betAmount;
+                userDoc.houseVault = (userDoc.houseVault || 0) + betAmount; // Masuk ke Kas Asrama
+                await userDoc.save();
+            } else if (rollRng < 0.87) {
+                // 12% 3x Kuali (🏺🏺🏺) - Hadiah x5
+                rolled1 = '🏺'; rolled2 = '🏺'; rolled3 = '🏺';
+                multiplier = 5;
+                userDoc.galleons += (betAmount * multiplier) - betAmount;
+                await userDoc.save();
+            } else if (rollRng < 0.92) {
+                // 5% 3x Sapu Terbang (🧹🧹🧹) - Hadiah x10
+                rolled1 = '🧹'; rolled2 = '🧹'; rolled3 = '🧹';
+                multiplier = 10;
+                userDoc.galleons += (betAmount * multiplier) - betAmount;
+                await userDoc.save();
+            } else if (rollRng < 0.94) {
+                // 2% 3x Topi Seleksi (🎩🎩🎩) - Hadiah x15
+                rolled1 = '🎩'; rolled2 = '🎩'; rolled3 = '🎩';
+                multiplier = 15;
+                userDoc.galleons += (betAmount * multiplier) - betAmount;
+                await userDoc.save();
+            } else {
+                // 1% Jackpot 3x Galleon Emas (🪙🪙🪙) - Hadiah x30
+                rolled1 = '🪙'; rolled2 = '🪙'; rolled3 = '🪙';
+                multiplier = 30;
+                userDoc.galleons += (betAmount * multiplier) - betAmount;
+                await userDoc.save();
+            }
+
+            let resultText = `Gulungan berhenti pada:\n\n **[  ${rolled1}  |  ${rolled2}  |  ${rolled3}  ]**\n\n`;
+            if (multiplier > 0) {
+                resultText += `🎉 **JACKPOT (x${multiplier})!** Selamat, kamu memenangkan **+${(betAmount * multiplier).toLocaleString()} Galleons**!`;
+            } else {
+                resultText += `💸 Zonk! Gambar tidak ada yang kembar.\nTaruhan hangus dan ditambahkan ke **Pundi-pundi Kas Asrama**!`;
+            }
+
+            const resultSlotEmbed = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🎰 Hasil Mesin Slot Gringotts')
+                .setDescription(resultText)
+                .setTimestamp();
+
+            await slotMsg.edit({ embeds: [resultSlotEmbed] });
+        }, 2500); 
+        return;
+    }
+
     // C. GENERAL MAGICAL COMMANDS
     if (command === '!profile') {
         const targetUser = message.mentions.users.first() || message.author;
@@ -484,7 +647,6 @@ client.on(Events.MessageCreate, async (message) => {
             xpNeeded = getXpNeededForNextLevel(userLevel); 
             wizardTitle = 'Lord of Magic';
             
-            // Sinkronisasi balance asli Lord of Magic dari database (fallback ke 999,999 jika dokumen belum ada)
             let ownerDoc = await User.findOne({ userId: targetUser.id, guildId: message.guild.id });
             userGalleons = ownerDoc ? (ownerDoc.galleons || 0) : 999999;
         } else {
@@ -554,7 +716,7 @@ client.on(Events.MessageCreate, async (message) => {
         return message.channel.send({ embeds: [lbEmbed] });
     }
 
-    // C. ROSTER TERPADU !student (Pemisah Garis Estetik & Emot Sesuai Asrama)
+    // C. ROSTER TERPADU !student
     if (command === '!student') {
         await message.guild.members.fetch();
 

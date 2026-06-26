@@ -5,8 +5,9 @@ const userSchema = new mongoose.Schema({
     guildId: { type: String, required: true },
     xp: { type: Number, default: 0 },
     level: { type: Number, default: 1 },
-    galleons: { type: Number, default: 0 },       // <-- Dompet Galleon
-    lastAbsen: { type: Date, default: null }      // <-- Pencatat waktu cooldown absen
+    galleons: { type: Number, default: 0 },
+    lastAbsen: { type: Date, default: null },
+    houseVault: { type: Number, default: 0 } // <-- Tambahan untuk Pundi-pundi Asrama
 });
 
 module.exports = mongoose.model('User', userSchema);
