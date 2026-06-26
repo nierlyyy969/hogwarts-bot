@@ -35,7 +35,7 @@ const HOUSES_DATA = [
     { id: '1475787032759631965', name: 'Hufflepuff', emoji: '🦡', command: 'hufflepuff' }
 ];
 
-// MENGEMBALIKAN FOLDER PENYIMPANAN KE ROOT DIRECTORY LOKAL (Agar tidak terhapus saat re-deploy Railway)
+// Database lokal paten (users.json sejajar dengan index.js)
 const dataPath = path.join(__dirname, 'users.json');
 
 function getDbData() {
@@ -251,7 +251,7 @@ client.on(Events.MessageCreate, async (message) => {
         return;
     }
 
-    // Blokir command umum jika belum mendapat role asrama
+    // Blokir command umum (Profile, Leaderboard, Roster) jika belum punya role kelas
     if (!isSorted && !isOwner) {
         if (['!profile', '!leaderboard', '!roster', '!rosterslytherin', '!rostergryffindor', '!rosterravenclaw', '!rosterhufflepuff'].some(cmd => command.startsWith(cmd))) {
             return message.reply('❌ **Akses Ditolak!** Perintah ini hanya boleh digunakan oleh murid yang sudah memiliki Role Asrama / Kelas (Lewat The Sorting Hat). Silakan hubungi Lord of Magic!');
