@@ -1,6 +1,5 @@
 require('dotenv').config();
-const fs = require('fs');
-const path = require('path');
+const mongoose = require('mongoose');
 
 const {
     Client,
@@ -11,6 +10,9 @@ const {
     ButtonStyle,
     EmbedBuilder
 } = require('discord.js');
+
+// Mengambil model User yang sudah kamu buat di folder /models
+const User = require('./models/User'); 
 
 const client = new Client({
     intents: [
@@ -23,7 +25,7 @@ const client = new Client({
 });
 
 // ==========================================
-// PENGATURAN HOGWARTS
+// PENGATURAN HOGWARTS & DATABASE
 // ==========================================
 const OWNER_ID = '1180180812327559310'; 
 const LEVEL_UP_CHANNEL_ID = '1475801714425860272'; 
@@ -35,24 +37,13 @@ const HOUSES_DATA = [
     { id: '1475787032759631965', name: 'Hufflepuff', emoji: '🦡', command: 'hufflepuff' }
 ];
 
-// Database lokal paten (users.json sejajar dengan index.js)
-const dataPath = path.join(__dirname, 'users.json');
-
-function getDbData() {
-    if (!fs.existsSync(dataPath)) {
-        return { users: {}, housePoints: { 'Gryffindor': 0, 'Slytherin': 0, 'Ravenclaw': 0, 'Hufflepuff': 0 } };
-    }
-    try {
-        const rawData = fs.readFileSync(dataPath, 'utf-8');
-        return JSON.parse(rawData);
-    } catch (e) {
-        return { users: {}, housePoints: { 'Gryffindor': 0, 'Slytherin': 0, 'Ravenclaw': 0, 'Hufflepuff': 0 } };
-    }
-}
-
-function saveDbData(data) {
-    fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
-}
+// Inisialisasi Poin Asrama Sementara di Memori
+let housePointsCache = {
+    'Gryffindor': 0,
+    'Slytherin': 0,
+    'Ravenclaw': 0,
+    'Hufflepuff': 0
+};
 
 function getXpNeededForNextLevel(level) {
     if (level >= 9999) return 49995;
@@ -86,63 +77,77 @@ function getWizardTitle(level, userId) {
 
 const xpCooldowns = new Set();
 
-client.once(Events.ClientReady, () => {
-    console.log(`Logged in as ${client.user.tag} — Database loaded from: ${dataPath}`);
+// ==========================================
+// KONEKSI DATABASE & BOT READY
+// ==========================================
+mongoose.connect(process.env.MONGO_URL || process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+}).then(() => {
+    console.log('🔗 Connected to MongoDB Database successfully!');
+    client.login(process.env.DISCORD_TOKEN);
+}).catch(err => {
+    console.error('❌ Failed to connect to MongoDB:', err);
+});
 
+client.once(Events.ClientReady, () => {
+    console.log(`✨ Logged in as ${client.user.tag} — System online! ✨`);
+
+    // Voice XP Loop Anti Reset
     setInterval(async () => {
         try {
-            let db = getDbData();
             const guilds = client.guilds.cache;
-
             for (const [guildId, guild] of guilds) {
                 guild.voiceStates.cache.forEach(async (voiceState) => {
                     const userId = voiceState.id;
 
                     if (voiceState.channelId && !voiceState.member.user.bot && userId !== OWNER_ID) {
-                        if (!db.users[userId]) {
-                            db.users[userId] = { xp: 0, level: 1, pointsContributed: 0 };
+                        let userDoc = await User.findOne({ userId, guildId: guild.id });
+                        if (!userDoc) {
+                            userDoc = new User({ userId, guildId: guild.id, xp: 0, level: 1 });
                         }
 
-                        if (db.users[userId].level >= 1000) return;
+                        if (userDoc.level >= 1000) return;
 
-                        db.users[userId].xp += 12;
+                        userDoc.xp += 12;
 
                         const userHouseObj = HOUSES_DATA.find(h => voiceState.member.roles.cache.has(h.id));
                         if (userHouseObj) {
-                            db.housePoints[userHouseObj.name] += 1;
-                            db.users[userId].pointsContributed += 1;
+                            housePointsCache[userHouseObj.name] = (housePointsCache[userHouseObj.name] || 0) + 1;
                         }
 
-                        let xpNeeded = getXpNeededForNextLevel(db.users[userId].level);
+                        let xpNeeded = getXpNeededForNextLevel(userDoc.level);
                         let levelUpOccurred = false;
                         let reachedLevelCheckpoint = false;
 
-                        while (db.users[userId].xp >= xpNeeded) {
-                            db.users[userId].xp -= xpNeeded;
-                            db.users[userId].level += 1;
-                            xpNeeded = getXpNeededForNextLevel(db.users[userId].level);
+                        while (userDoc.xp >= xpNeeded) {
+                            userDoc.xp -= xpNeeded;
+                            userDoc.level += 1;
+                            xpNeeded = getXpNeededForNextLevel(userDoc.level);
                             levelUpOccurred = true;
 
-                            if (db.users[userId].level % 5 === 0) {
+                            if (userDoc.level % 5 === 0) {
                                 reachedLevelCheckpoint = true;
                             }
 
-                            if (db.users[userId].level >= 1000) {
-                                db.users[userId].level = 1000;
-                                db.users[userId].xp = 0;
+                            if (userDoc.level >= 1000) {
+                                userDoc.level = 1000;
+                                userDoc.xp = 0;
                                 break;
                             }
                         }
 
+                        await userDoc.save();
+
                         if (levelUpOccurred && reachedLevelCheckpoint) {
-                            const newTitle = getWizardTitle(db.users[userId].level, userId);
+                            const newTitle = getWizardTitle(userDoc.level, userId);
                             const levelUpChannel = guild.channels.cache.get(LEVEL_UP_CHANNEL_ID);
                             
                             if (levelUpChannel) {
                                 const levelUpEmbed = new EmbedBuilder()
                                     .setColor('#25a5cf') 
                                     .setTitle('✨ Hogwarts Academy Milestone!')
-                                    .setDescription(`Selamat! <@${userId}> telah mencapai **Level ${db.users[userId].level}** dan kini bergelar **${newTitle}**! 🎓 Pencapaian yang luar biasa!`)
+                                    .setDescription(`Selamat! <@${userId}> telah mencapai **Level ${userDoc.level}** dan kini bergelar **${newTitle}**! 🎓 Pencapaian yang luar biasa!`)
                                     .setTimestamp();
 
                                 levelUpChannel.send({ embeds: [levelUpEmbed] }).catch(console.error);
@@ -151,19 +156,18 @@ client.once(Events.ClientReady, () => {
                     }
                 });
             }
-            saveDbData(db);
         } catch (err) {
             console.error('Masalah saat memproses Voice XP Loop:', err);
         }
     }, 60000); 
 });
 
-client.on(Events.GuildMemberRemove, (member) => {
-    let db = getDbData();
-    if (db.users[member.id]) {
-        delete db.users[member.id];
-        saveDbData(db);
+client.on(Events.GuildMemberRemove, async (member) => {
+    try {
+        await User.findOneAndDelete({ userId: member.id, guildId: member.guild.id });
         console.log(`🧹 Data level dari ${member.user.username} di-reset otomatis karena keluar server.`);
+    } catch (err) {
+        console.error('Gagal menghapus data member keluar:', err);
     }
 });
 
@@ -192,14 +196,16 @@ client.on(Events.MessageCreate, async (message) => {
         if (!targetUser || isNaN(newLevel)) return message.reply('🔮 **Format Salah!** Gunakan: `!setlevel @User <angka_level>`');
         if (targetUser.id === OWNER_ID) return message.reply('👑 Level Lord sudah dikunci permanen di puncak tertinggi!');
 
-        let db = getDbData();
-        if (!db.users[targetUser.id]) db.users[targetUser.id] = { xp: 0, level: 1, pointsContributed: 0 };
+        let userDoc = await User.findOne({ userId: targetUser.id, guildId: message.guild.id });
+        if (!userDoc) {
+            userDoc = new User({ userId: targetUser.id, guildId: message.guild.id, xp: 0, level: 1 });
+        }
 
-        db.users[targetUser.id].level = Math.min(newLevel, 1000); 
-        db.users[targetUser.id].xp = 0; 
-        saveDbData(db);
+        userDoc.level = Math.min(newLevel, 1000); 
+        userDoc.xp = 0; 
+        await userDoc.save();
 
-        message.reply(`✅ Berhasil mengubah tingkat sihir ${targetUser} menjadi **Level ${db.users[targetUser.id].level}**!`);
+        message.reply(`✅ Berhasil mengubah tingkat sihir ${targetUser} menjadi **Level ${userDoc.level}**!`);
         return;
     }
 
@@ -213,12 +219,7 @@ client.on(Events.MessageCreate, async (message) => {
         const targetHouse = HOUSES_DATA.find(h => targetMember.roles.cache.has(h.id));
         if (!targetHouse) return message.reply('❌ Penyihir tersebut belum bergabung dengan asrama Hogwarts mana pun!');
 
-        let db = getDbData();
-        if (!db.users[targetMember.id]) db.users[targetMember.id] = { xp: 0, level: 1, pointsContributed: 0 };
-
-        db.housePoints[targetHouse.name] += points;
-        db.users[targetMember.id].pointsContributed += points;
-        saveDbData(db);
+        housePointsCache[targetHouse.name] = (housePointsCache[targetHouse.name] || 0) + points;
 
         return message.reply(`🏆 **+${points.toLocaleString()} Poin** telah dianugerahkan ke asrama **${targetHouse.emoji} ${targetHouse.name}** berkat prestasi ${targetMember}!`);
     }
@@ -251,7 +252,7 @@ client.on(Events.MessageCreate, async (message) => {
         return;
     }
 
-    // Blokir command umum (Profile, Leaderboard, Roster) jika belum punya role kelas
+    // Blokir command umum jika belum mendapat role kelas asrama
     if (!isSorted && !isOwner) {
         if (['!profile', '!leaderboard', '!roster', '!rosterslytherin', '!rostergryffindor', '!rosterravenclaw', '!rosterhufflepuff'].some(cmd => command.startsWith(cmd))) {
             return message.reply('❌ **Akses Ditolak!** Perintah ini hanya boleh digunakan oleh murid yang sudah memiliki Role Asrama / Kelas (Lewat The Sorting Hat). Silakan hubungi Lord of Magic!');
@@ -263,22 +264,22 @@ client.on(Events.MessageCreate, async (message) => {
         const targetUser = message.mentions.users.first() || message.author;
         const targetMember = message.guild.members.cache.get(targetUser.id);
         
-        let db = getDbData();
-        let userLevel, userXp, xpNeeded, wizardTitle, pointsContributed;
+        let userLevel, userXp, xpNeeded, wizardTitle;
+        let pointsContributed = 0; // Karena di skrip awal poin kontribusi terpusat ke Users
 
         if (targetUser.id === OWNER_ID) {
             userLevel = 9999;
             userXp = 0; 
             xpNeeded = getXpNeededForNextLevel(userLevel); 
             wizardTitle = 'Lord of Magic';
-            pointsContributed = db.users[OWNER_ID] ? db.users[OWNER_ID].pointsContributed : 0;
         } else {
-            const userData = db.users[targetUser.id] || { xp: 0, level: 1, pointsContributed: 0 };
-            userLevel = userData.level;
-            userXp = userData.xp;
+            let userDoc = await User.findOne({ userId: targetUser.id, guildId: message.guild.id });
+            if (!userDoc) userDoc = new User({ userId: targetUser.id, guildId: message.guild.id, xp: 0, level: 1 });
+            
+            userLevel = userDoc.level;
+            userXp = userDoc.xp;
             xpNeeded = getXpNeededForNextLevel(userLevel);
             wizardTitle = getWizardTitle(userLevel, targetUser.id);
-            pointsContributed = userData.pointsContributed;
         }
         
         const targetHouse = HOUSES_DATA.find(h => targetMember.roles.cache.has(h.id));
@@ -318,8 +319,7 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     if (command === '!leaderboard') {
-        let db = getDbData();
-        const sortedHouses = Object.entries(db.housePoints).sort((a, b) => b[1] - a[1]);
+        const sortedHouses = Object.entries(housePointsCache).sort((a, b) => b[1] - a[1]);
 
         const lbEmbed = new EmbedBuilder()
             .setColor('#25a5cf') 
@@ -334,7 +334,7 @@ client.on(Events.MessageCreate, async (message) => {
         return message.channel.send({ embeds: [lbEmbed] });
     }
 
-    // FITUR TAMBAHAN: Roster Anggota Asrama (Display Name + Emotikon Sihir rapi tanpa tag/ping)
+    // FITUR TAMBAHAN: Roster Anggota Asrama (Hanya Display Name & Emotikon Sihir rapi)
     const targetHouseRoster = HOUSES_DATA.find(h => `!roster${h.command}` === command);
     if (targetHouseRoster) {
         await message.guild.members.fetch(); 
@@ -370,54 +370,53 @@ client.on(Events.MessageCreate, async (message) => {
     // C. AUTOMATIC XP SYSTEM (Chat Text - 15 XP Flat)
     if (userId !== OWNER_ID && !xpCooldowns.has(userId)) {
         try {
-            let db = getDbData();
-            if (!db.users[userId]) {
-                db.users[userId] = { xp: 0, level: 1, pointsContributed: 0 };
+            let userDoc = await User.findOne({ userId, guildId: message.guild.id });
+            if (!userDoc) {
+                userDoc = new User({ userId, guildId: message.guild.id, xp: 0, level: 1 });
             }
 
-            if (db.users[userId].level >= 1000) return;
+            if (userDoc.level >= 1000) return;
 
             const xpGained = 15;
-            db.users[userId].xp += xpGained;
+            userDoc.xp += xpGained;
 
             if (userHouseObj) {
-                db.housePoints[userHouseObj.name] += 1;
-                db.users[userId].pointsContributed += 1;
+                housePointsCache[userHouseObj.name] = (housePointsCache[userHouseObj.name] || 0) + 1;
             }
 
-            let xpNeeded = getXpNeededForNextLevel(db.users[userId].level);
+            let xpNeeded = getXpNeededForNextLevel(userDoc.level);
             let levelUpOccurred = false;
             let reachedLevelCheckpoint = false;
 
-            while (db.users[userId].xp >= xpNeeded) {
-                db.users[userId].xp -= xpNeeded; 
-                db.users[userId].level += 1; 
-                xpNeeded = getXpNeededForNextLevel(db.users[userId].level);
+            while (userDoc.xp >= xpNeeded) {
+                userDoc.xp -= xpNeeded; 
+                userDoc.level += 1; 
+                xpNeeded = getXpNeededForNextLevel(userDoc.level);
                 levelUpOccurred = true;
 
-                if (db.users[userId].level % 5 === 0) {
+                if (userDoc.level % 5 === 0) {
                     reachedLevelCheckpoint = true;
                 }
 
-                if (db.users[userId].level >= 1000) {
-                    db.users[userId].level = 1000;
-                    db.users[userId].xp = 0;
+                if (userDoc.level >= 1000) {
+                    userDoc.level = 1000;
+                    userDoc.xp = 0;
                     break;
                 }
             }
 
             if (levelUpOccurred && reachedLevelCheckpoint) {
-                const newTitle = getWizardTitle(db.users[userId].level, userId);
+                const newTitle = getWizardTitle(userDoc.level, userId);
                 const levelUpEmbed = new EmbedBuilder()
                     .setColor('#25a5cf') 
                     .setTitle('✨ Hogwarts Academy Milestone!')
-                    .setDescription(`Selamat! <@${userId}> telah mencapai **Level ${db.users[userId].level}** dan kini bergelar **${newTitle}**! 🎓 Pencapaian yang luar biasa!`)
+                    .setDescription(`Selamat! <@${userId}> telah mencapai **Level ${userDoc.level}** dan kini bergelar **${newTitle}**! 🎓 Pencapaian yang luar biasa!`)
                     .setTimestamp();
 
                 await levelUpChannel.send({ embeds: [levelUpEmbed] });
             }
 
-            saveDbData(db);
+            await userDoc.save();
             
             xpCooldowns.add(userId);
             setTimeout(() => xpCooldowns.delete(userId), 60000);
@@ -445,5 +444,3 @@ client.on(Events.InteractionCreate, async interaction => {
 
     await interaction.reply({ content: `🎩 The Sorting Hat has chosen...\n\n${randomHouse.emoji} ${randomHouse.name}!`, ephemeral: true });
 });
-
-client.login(process.env.DISCORD_TOKEN);
