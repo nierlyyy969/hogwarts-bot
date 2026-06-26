@@ -22,6 +22,51 @@ const client = new Client({
 const mongoose = require('mongoose');
 
 mongoose.connect(process.env.MONGO_URI)
+const fs = require('fs');
+const path = require('path');
+const dataPath = path.join(__dirname, 'users.json');
+
+// Fungsi pembantu untuk membaca dan menulis data level
+function getUserData() {
+    if (!fs.existsSync(dataPath)) fs.writeFileSync(dataPath, JSON.stringify({}));
+    return JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+}
+function saveUserData(data) {
+    fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
+}
+
+// Kalibrasi Event Message
+client.on('messageCreate', async (message) => {
+    if (message.author.bot || !message.guild) return;
+
+    // ----- PERINTAH TES INSTAN -----
+    if (message.content === '!levelup') {
+        const levelUpChannelId = 'ID_CHANNEL_LEVEL_UP_KAMU'; // Ganti dengan ID channel asli jika mau khusus
+        const targetChannel = message.guild.channels.cache.get(levelUpChannelId) || message.channel;
+        return targetChannel.send(`✨ **Selamat!** ${message.author} telah naik ke **Level 2** dan sekarang bergelar **🌱 First Year**! 🎓`);
+    }
+
+    // ----- SISTEM XP LOKAL -----
+    let db = getUserData();
+    const userId = message.author.id;
+
+    if (!db[userId]) {
+        db[userId] = { xp: 0, level: 1 };
+    }
+
+    // Tambah XP acak 15-25
+    db[userId].xp += Math.floor(Math.random() * 11) + 15;
+
+    // Cek naik level (misal per level butuh 500 XP)
+    let nextLevelXp = db[userId].level * 500;
+    if (db[userId].xp >= nextLevelXp) {
+        db[userId].level += 1;
+        message.channel.send(`✨ **Selamat!** ${message.author} telah naik ke **Level ${db[userId].level}**! 🎓`);
+    }
+
+    saveUserData(db);
+});
+
   .then(() => console.log('Sukses terhubung ke Database Hogwarts!'))
   .catch(err => console.error('Gagal terhubung ke database:', err));
 
