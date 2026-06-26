@@ -144,7 +144,7 @@ client.once(Events.ClientReady, () => {
                             
                             if (levelUpChannel) {
                                 const levelUpEmbed = new EmbedBuilder()
-                                    .setColor('#636aff') 
+                                    .setColor('#25a5cf') // Diubah ke #25a5cf
                                     .setTitle('✨ Hogwarts Academy Level Up!')
                                     .setDescription(`Selamat! <@${userId}> naik ke **Level ${db.users[userId].level}** lewat kekuatan Voice Channel dan kini bergelar **${newTitle}**! 🎓`)
                                     .setTimestamp();
@@ -228,7 +228,7 @@ client.on(Events.MessageCreate, async (message) => {
     if (command === '!levelup') {
         if (userId !== OWNER_ID) return message.reply('❌ Perintah ini khusus untuk Lord of Magic!');
         const testEmbed = new EmbedBuilder()
-            .setColor('#636aff')
+            .setColor('#25a5cf') // Diubah ke #25a5cf
             .setTitle('✨ Hogwarts Academy Level Up!')
             .setDescription(`Selamat! ${message.author} telah naik level! 🎓`)
             .setTimestamp();
@@ -260,7 +260,7 @@ client.on(Events.MessageCreate, async (message) => {
             pointsContributed = userData.pointsContributed;
         }
         
-        const targetHouse = houses.find(h => targetMember.roles.cache.has(h.id));
+        const targetHouse = houses.find(h => message.guild.members.cache.get(targetUser.id)?.roles.cache.has(h.id));
         const houseName = targetHouse ? `${targetHouse.emoji} ${targetHouse.name}` : 'Belum Masuk Asrama';
 
         const totalBars = 32;
@@ -293,7 +293,7 @@ client.on(Events.MessageCreate, async (message) => {
         const sortedHouses = Object.entries(db.housePoints).sort((a, b) => b[1] - a[1]);
 
         const lbEmbed = new EmbedBuilder()
-            .setColor('#636aff')
+            .setColor('#25a5cf') // Diubah ke #25a5cf
             .setTitle('🏆 House Cup Tournament - Leaderboard')
             .setDescription('Klasemen asrama Hogwarts saat ini:\n\n' + sortedHouses.map((house, index) => {
                 const houseMeta = houses.find(h => h.name === house[0]);
@@ -312,7 +312,7 @@ client.on(Events.MessageCreate, async (message) => {
         }
 
         const embed = new EmbedBuilder()
-            .setColor('#636aff')
+            .setColor('#25a5cf') // Diubah ke #25a5cf
             .setTitle('🎩 The Sorting Hat')
             .setDescription('Welcome to **Hogwarts Academy**\n\nSilahkan tekan tombol di bawah dan biarkan Sorting Hat menentukan kelasmu!');
 
@@ -363,7 +363,7 @@ client.on(Events.MessageCreate, async (message) => {
             if (levelUpOccurred) {
                 const newTitle = getWizardTitle(db.users[userId].level, userId);
                 const levelUpEmbed = new EmbedBuilder()
-                    .setColor('#636aff')
+                    .setColor('#25a5cf') // Diubah ke #25a5cf
                     .setTitle('✨ Hogwarts Academy Level Up!')
                     .setDescription(`Selamat! <@${userId}> telah naik ke **Level ${db.users[userId].level}** dan sekarang bergelar **${newTitle}**! 🎓`)
                     .setTimestamp();
