@@ -18,7 +18,7 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildVoiceStates // WAJIB DIKEMBALIKAN: Untuk mendeteksi durasi VC
+        GatewayIntentBits.GuildVoiceStates // Untuk mendeteksi durasi Voice Channel
     ]
 });
 
@@ -54,7 +54,7 @@ function saveDbData(data) {
     fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
 }
 
-// BARU: Rumus Kelipatan Linear Sesuai Hitungan Target Level 1000
+// Rumus Kelipatan Linear Sesuai Hitungan Target Level 1000
 function getXpNeededForNextLevel(level) {
     if (level >= 9999) return 49995; // Limit display bar untuk owner
     return level * 5; 
@@ -91,7 +91,7 @@ const xpCooldowns = new Set();
 client.once(Events.ClientReady, () => {
     console.log(`Logged in as ${client.user.tag}`);
 
-    // BARU: LOOP INTERVAL VOICE CHANNEL XP (Berjalan otomatis setiap 1 menit)
+    // LOOP INTERVAL VOICE CHANNEL XP (Berjalan otomatis setiap 1 menit)
     setInterval(async () => {
         try {
             let db = getDbData();
@@ -144,7 +144,7 @@ client.once(Events.ClientReady, () => {
                             
                             if (levelUpChannel) {
                                 const levelUpEmbed = new EmbedBuilder()
-                                    .setColor('#636aff') // Warna khas ungu elegan
+                                    .setColor('#636aff') 
                                     .setTitle('✨ Hogwarts Academy Level Up!')
                                     .setDescription(`Selamat! <@${userId}> naik ke **Level ${db.users[userId].level}** lewat kekuatan Voice Channel dan kini bergelar **${newTitle}**! 🎓`)
                                     .setTimestamp();
@@ -159,7 +159,7 @@ client.once(Events.ClientReady, () => {
         } catch (err) {
             console.error('Masalah saat memproses Voice XP Loop:', err);
         }
-    }, 60000); // Sinkronisasi database per 1 menit
+    }, 60000); 
 });
 
 // DETEKSI MEMBER KELUAR SERVER (RESET LEVEL)
@@ -306,6 +306,11 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     if (command === '!sortinghat') {
+        // DIBATASI: Sorting Hat kini hanya bisa dipanggil oleh Lord of Magic (Owner)
+        if (userId !== OWNER_ID) {
+            return message.reply('❌ Hanya Lord of Magic yang berhak memanggil The Sorting Hat!');
+        }
+
         const embed = new EmbedBuilder()
             .setColor('#636aff')
             .setTitle('🎩 The Sorting Hat')
@@ -319,7 +324,7 @@ client.on(Events.MessageCreate, async (message) => {
         return;
     }
 
-    // C. AUTOMATIC XP SYSTEM (Chat Text - Diubah Menjadi Tetap 15 XP Flat)
+    // C. AUTOMATIC XP SYSTEM (Chat Text - 15 XP Flat)
     if (userId !== OWNER_ID && !xpCooldowns.has(userId)) {
         try {
             let db = getDbData();
@@ -329,7 +334,7 @@ client.on(Events.MessageCreate, async (message) => {
 
             if (db.users[userId].level >= 1000) return;
 
-            // Diubah menjadi 15 EXP Flat sesuai hitungan matang
+            // Penambahan 15 EXP Flat per chat valid
             const xpGained = 15;
             db.users[userId].xp += xpGained;
 
@@ -369,7 +374,7 @@ client.on(Events.MessageCreate, async (message) => {
             saveDbData(db);
             
             xpCooldowns.add(userId);
-            setTimeout(() => xpCooldowns.delete(userId), 60000);
+            setTimeout(() => xpCooldowns.delete(userId), 60000); // Cooldown 1 menit agar tidak spam chat
 
         } catch (err) {
             console.error('Masalah saat memproses XP Chat:', err);
