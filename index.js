@@ -219,7 +219,7 @@ client.on(Events.MessageCreate, async (message) => {
         const targetHouse = HOUSES_DATA.find(h => targetMember.roles.cache.has(h.id));
         if (!targetHouse) return message.reply('❌ Penyihir tersebut belum bergabung dengan asrama Hogwarts mana pun!');
 
-        housePointsCache[targetHouse.name] = (housePointsCache[targetHouse.name] || 0) + points;
+        housePointsCacheUpdate(targetHouse.name, points);
 
         return message.reply(`🏆 **+${points.toLocaleString()} Poin** telah dianugerahkan ke asrama **${targetHouse.emoji} ${targetHouse.name}** berkat prestasi ${targetMember}!`);
     }
@@ -274,7 +274,10 @@ client.on(Events.MessageCreate, async (message) => {
             wizardTitle = 'Lord of Magic';
         } else {
             let userDoc = await User.findOne({ userId: targetUser.id, guildId: message.guild.id });
-            if (!userDoc) userDoc = new User({ userId: targetUser.id, guildId: message.guild.id, xp: 0, level: 1 });
+            if (!userDoc) {
+                userDoc = new User({ userId: targetUser.id, guildId: message.guild.id, xp: 0, level: 1 });
+                await userDoc.save();
+            }
             
             userLevel = userDoc.level;
             userXp = userDoc.xp;
@@ -381,7 +384,7 @@ client.on(Events.MessageCreate, async (message) => {
             userDoc.xp += xpGained;
 
             if (userHouseObj) {
-                housePointsCache[userHouseObj.name] = (housePointsCache[userHouseObj.name] || 0) + 1;
+                houseCacheUpdate(userHouseObj.name, 1);
             }
 
             let xpNeeded = getXpNeededForNextLevel(userDoc.level);
@@ -444,5 +447,9 @@ client.on(Events.InteractionCreate, async interaction => {
 
     await interaction.reply({ content: `🎩 The Sorting Hat has chosen...\n\n${randomHouse.emoji} ${randomHouse.name}!`, ephemeral: true });
 });
+
+function houseCacheUpdate(houseName, points) {
+    housePointsCache[houseName] = (housePointsCache[houseName] || 0) + points;
+}
 
 client.login(process.env.DISCORD_TOKEN);
