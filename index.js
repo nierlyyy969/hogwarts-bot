@@ -24,42 +24,18 @@ const client = new Client({
 });
 
 // ==========================================
-// PENGATURAN GLOBAL HOGWARTS
+// PENGATURAN HOGWARTS
 // ==========================================
 const OWNER_ID = '1180180812327559310'; 
 const LEVEL_UP_CHANNEL_ID = '1475801714425860272'; 
 
-// Direct Link Aset Perkamen & Logo Asrama
-const MAIN_BG_URL = 'https://i.imgur.com/1gKWPaA.png'; 
-
 const houses = [
-    { 
-        id: '1475605712938864796', 
-        name: 'Gryffindor', 
-        emoji: '🦁', 
-        img: 'https://i.imgur.com/1go5VXj.png' 
-    },
-    { 
-        id: '1475786100210401413', 
-        name: 'Slytherin', 
-        emoji: '🐍', 
-        img: 'https://i.imgur.com/gPLI7Fo.png' 
-    },
-    { 
-        id: '1475786808167235604', 
-        name: 'Ravenclaw', 
-        emoji: '🦅', 
-        img: 'https://i.imgur.com/SiyKVTW.png' 
-    },
-    { 
-        id: '1475787032759631965', 
-        name: 'Hufflepuff', 
-        emoji: '🦡', 
-        img: 'https://i.imgur.com/7PyCEAA.png' 
-    }
+    { id: '1475605712938864796', name: 'Gryffindor', emoji: '🦁', color: '#740001', accent: '#e3a00e' },
+    { id: '1475786100210401413', name: 'Slytherin', emoji: '🐍', color: '#1a472a', accent: '#aaaaaa' },
+    { id: '1475786808167235604', name: 'Ravenclaw', emoji: '🦅', color: '#0e1a40', accent: '#946b2d' },
+    { id: '1475787032759631965', name: 'Hufflepuff', emoji: '🦡', color: '#ffcc00', accent: '#000000' }
 ];
 
-// Setup Penyimpanan JSON Lokal
 const dataPath = path.join(__dirname, 'users.json');
 
 function getDbData() {
@@ -76,9 +52,8 @@ function saveDbData(data) {
 function getXpNeededForNextLevel(level) {
     if (level >= 500) {
         return Math.floor(500 * Math.pow(level, 1.5));
-    } else {
-        return level * 500;
     }
+    return level * 500;
 }
 
 function getWizardTitle(level, userId) {
@@ -113,87 +88,180 @@ client.once(Events.ClientReady, () => {
 });
 
 // ==========================================
-// 🪄 SISTEM GENERATOR PROFIL (CANVAS)
+// 🪄 CANVAS MURNI: GENERATOR KARTU PROFIL
 // ==========================================
 async function generateProfileCard(userData, user, guildMember) {
     const canvas = createCanvas(1200, 750);
     const ctx = canvas.getContext('2d');
 
-    // 1. Gambar Latar Belakang Perkamen Antik Hogwarts
-    const background = await loadImage(MAIN_BG_URL);
-    ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+    const houseObj = houses.find(h => guildMember.roles.cache.has(h.id));
+    const houseColor = houseObj ? houseObj.color : '#2c221e';
+    const houseAccent = houseObj ? houseObj.accent : '#d4af37';
 
-    // 2. Muat Avatar Discord user
-    const avatar = await loadImage(user.displayAvatarURL({ extension: 'png', size: 512 }));
-    
-    // 3. Tentukan Logo Asrama User (Jika ada)
-    const houseObj = houses.find(h => guildMember?.roles.cache.has(h.id));
+    // 1. Latar Belakang Perkamen Antik
+    ctx.fillStyle = '#f6ebcf';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // --- MENGGAMBAR AVATAR ---
-    // Potongan melingkar untuk avatar (x: 200, y: 350, jari-jari 110)
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(200, 350, 110, 0, Math.PI * 2, true);
-    ctx.closePath();
-    ctx.clip();
-    ctx.drawImage(avatar, 90, 240, 220, 220); 
-    ctx.restore();
-
-    // Bingkai perak avatar
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = '#b0b7bd'; 
-    ctx.beginPath();
-    ctx.arc(200, 350, 110, 0, Math.PI * 2, true);
-    ctx.stroke();
-
-    // --- MENGGAMBAR LOGO ASRAMA ---
-    if (houseObj) {
-        const houseLogo = await loadImage(houseObj.img);
-        // Posisi logo asrama di plakat tengah ledger (x: 480, y: 220, ukuran 240x240)
-        ctx.drawImage(houseLogo, 480, 220, 240, 240);
+    // Efek serat kertas / tekstur klasik
+    ctx.fillStyle = 'rgba(100, 70, 30, 0.03)';
+    for (let i = 0; i < 500; i++) {
+        ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, Math.random() * 3 + 1, Math.random() * 100 + 20);
     }
 
-    // --- MENGGAMBAR TEKS & DATA ---
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#2c221e'; // Tinta antik
+    // 2. Bingkai Utama / Border Klasik
+    ctx.lineWidth = 16;
+    ctx.strokeStyle = '#4a3b32';
+    ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
 
-    // Username di bawah avatar
-    ctx.font = '32px Georgia, serif';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = houseAccent;
+    ctx.strokeRect(32, 32, canvas.width - 64, canvas.height - 64);
+
+    // 3. Plakat Header "HOGWARTS ACADEMY"
+    ctx.fillStyle = '#2c221e';
+    ctx.fillRect(250, 45, 700, 75);
+    
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = houseAccent;
+    ctx.strokeRect(250, 45, 700, 75);
+
+    ctx.fillStyle = '#d4af37';
+    ctx.font = 'bold 36px Georgia, serif';
     ctx.textAlign = 'center';
-    ctx.fillText(user.username, 200, 490);
+    ctx.fillText('HOGWARTS ACADEMY', 600, 93);
 
-    // Level & Gelar (Kanan)
-    ctx.textAlign = 'left';
-    ctx.font = '72px Georgia, serif';
-    ctx.fillText(`Level ${userData.level}`, 800, 330);
+    // Subtitle Wizard Profile
+    ctx.fillStyle = '#4a3b32';
+    ctx.font = 'italic 24px Georgia, serif';
+    ctx.fillText(`WIZARD PROFILE • ${user.username.toUpperCase()}`, 600, 150);
+
+    // 4. Bingkai Avatar (Kiri) & Plakat Nama
+    // Bingkai Avatar
+    ctx.lineWidth = 8;
+    ctx.strokeStyle = houseAccent;
+    ctx.beginPath();
+    ctx.arc(200, 350, 120, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.stroke();
+
+    // Gambar Avatar Melingkar
+    try {
+        const avatar = await loadImage(user.displayAvatarURL({ extension: 'png', size: 512 }));
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(200, 350, 112, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(avatar, 88, 238, 224, 224);
+        ctx.restore();
+    } catch (e) {
+        console.error('Gagal memuat avatar:', e);
+    }
+
+    // Plakat Nama di bawah Avatar
+    ctx.fillStyle = '#3a2e2b';
+    ctx.fillRect(75, 485, 250, 50);
+    ctx.strokeStyle = '#8c7853';
+    ctx.strokeRect(75, 485, 250, 50);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 24px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(user.username, 200, 520);
+
+    // 5. Plakat Asrama (Tengah)
+    ctx.fillStyle = houseColor;
+    ctx.fillRect(425, 200, 350, 300);
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = houseAccent;
+    ctx.strokeRect(425, 200, 350, 300);
+
+    // Simbol Emoji Asrama Raksasa di Plakat Tengah
+    if (houseObj) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '120px sans-serif'; // Emoji dirender via font sistem
+        ctx.textAlign = 'center';
+        ctx.fillText(houseObj.emoji, 600, 360);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 32px Georgia, serif';
+        ctx.fillText(houseObj.name.toUpperCase(), 600, 430);
+        
+        ctx.font = 'italic 20px Georgia, serif';
+        ctx.fillStyle = houseAccent;
+        ctx.fillText('Hogwarts House', 600, 465);
+    } else {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '36px Georgia, serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🥚 MUGGLE', 600, 350);
+        ctx.font = '20px Georgia, serif';
+        ctx.fillStyle = '#b0a692';
+        ctx.fillText('(Belum di-Sorting Hat)', 600, 390);
+    }
+
+    // 6. Plakat Status Level & Gelar (Kanan)
+    ctx.fillStyle = '#3a2e2b';
+    ctx.fillRect(825, 200, 325, 300);
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = '#8c7853';
+    ctx.strokeRect(825, 200, 325, 300);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 48px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`LEVEL ${userData.level}`, 987, 280);
 
     const title = getWizardTitle(userData.level, user.id);
-    ctx.font = '36px Georgia, serif';
-    ctx.fillStyle = user.id === OWNER_ID ? '#b38f00' : '#2c221e'; // Emas untuk Lord
-    ctx.fillText(title, 800, 380);
+    ctx.font = 'bold italic 24px Georgia, serif';
+    ctx.fillStyle = user.id === OWNER_ID ? '#ffd700' : houseAccent;
+    ctx.fillText(title, 987, 340);
 
-    // House Cup Contribution (Bawah kanan)
-    ctx.fillStyle = '#2c221e';
-    ctx.font = '32px Georgia, serif';
-    ctx.fillText(`${userData.pointsContributed.toLocaleString()} Points`, 850, 615);
+    // Sub-plakat House Cup Contribution (Kanan Bawah Kotak Level)
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.fillRect(850, 385, 275, 90);
+    ctx.strokeStyle = '#5c4a43';
+    ctx.strokeRect(850, 385, 275, 90);
 
-    // --- MENGGAMBAR PROGRESS BAR XP (Kiri Bawah) ---
+    ctx.fillStyle = '#b0a692';
+    ctx.font = '20px Georgia, serif';
+    ctx.fillText('🏆 HOUSE CUP CONTRIBUTION', 987, 415);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 28px Georgia, serif';
+    ctx.fillText(`${userData.pointsContributed.toLocaleString()} POINTS`, 987, 455);
+
+    // 7. Progress Bar XP (Kiri Bawah)
     const xpNeeded = getXpNeededForNextLevel(userData.level);
     const xpPercentage = Math.min(userData.xp / xpNeeded, 1);
-    
-    // Latar Bar 
-    ctx.fillStyle = '#d9cfc1'; 
-    ctx.fillRect(280, 615, 400, 40);
 
-    // Isi Bar Progress
-    ctx.fillStyle = '#4169e1'; // Biru Sihir
-    ctx.fillRect(280, 615, 400 * xpPercentage, 40);
+    // Label Progress Bar
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#4a3b32';
+    ctx.font = 'bold 22px Georgia, serif';
+    ctx.fillText('🪄 MAGIC KNOWLEDGE PROGRESS (XP)', 75, 575);
 
-    // Teks Progress XP
+    // Wadah Bar (Abu-abu Antik)
+    ctx.fillStyle = '#d1c5a9';
+    ctx.fillRect(75, 600, 690, 45);
+    ctx.strokeStyle = '#635446';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(75, 600, 690, 45);
+
+    // Isi Bar (Warna Sesuai Asrama)
+    ctx.fillStyle = houseColor;
+    ctx.fillRect(78, 603, 684 * xpPercentage, 39);
+
+    // Teks Angka XP di dalam bar
     ctx.fillStyle = '#ffffff';
-    ctx.font = '24px Georgia, serif';
+    ctx.font = 'bold 24px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(`${userData.xp.toLocaleString()} / ${xpNeeded.toLocaleString()} XP`, 480, 642);
+    ctx.fillText(`${userData.xp.toLocaleString()} / ${xpNeeded.toLocaleString()} XP`, 420, 630);
+
+    // 8. Footer Ledger
+    ctx.fillStyle = '#4a3b32';
+    ctx.font = '16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('HOGWARTS ACADEMY STUDENT LEDGER • WIZARDING WORLD OFFICIAL', 600, 715);
 
     return new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'profile.png' });
 }
@@ -268,7 +336,7 @@ client.on(Events.MessageCreate, async (message) => {
             loadingMessage.delete();
         } catch (error) {
             console.error('Gagal meracik kanvas profil:', error);
-            loadingMessage.edit('❌ Gagal meracik sihir profil. Pastikan tautan gambar latar dan asrama sudah benar.');
+            loadingMessage.edit('❌ Gagal meracik sihir profil.');
         }
         return;
     }
@@ -310,7 +378,7 @@ client.on(Events.MessageCreate, async (message) => {
     // C. AUTOMATIC XP & LEVELING SYSTEM
     if (!xpCooldowns.has(userId)) {
         try {
-            if (!userHouseObj && userId !== OWNER_ID) return; 
+            if (!userObj && userId !== OWNER_ID) return; 
 
             let db = getDbData();
             if (!db.users[userId]) {
@@ -323,8 +391,8 @@ client.on(Events.MessageCreate, async (message) => {
             const xpGained = Math.floor(Math.random() * 11) + 15;
             db.users[userId].xp += xpGained;
 
-            if (userHouseObj) {
-                db.housePoints[userHouseObj.name] += 1;
+            if (userObj) {
+                db.housePoints[userObj.name] += 1;
                 db.users[userId].pointsContributed += 1;
             }
 
