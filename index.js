@@ -96,6 +96,23 @@ if (!message.author.bot && message.guild) {
                 }
             }
 
+if (message.content === '!levelup') {
+    
+    if (message.author.bot) return;
+
+   
+    const levelUpChannelId = '1475801714425860272'; 
+    const targetChannel = message.guild.channels.cache.get(levelUpChannelId) || message.channel;
+
+    
+    targetChannel.send(`✨ **Selamat!** ${message.author} telah naik ke **Level 2** dan sekarang bergelar **🌱 First Year**! 🎓`);
+    
+   
+    if (targetChannel.id !== message.channel.id) {
+        message.reply('✅ Pesan simulasi level-up telah dikirim ke channel khusus!');
+    }
+}
+
             await userData.save();
 
             xpCooldowns.add(userId);
