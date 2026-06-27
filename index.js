@@ -188,8 +188,8 @@ client.on(Events.MessageCreate, async (message) => {
     const isOwner = userId === OWNER_ID;
     const isSorted = !!userHouseObj;
 
-    // Fungsi Cooldown Check (Diubah menjadi 10 Detik)
-    const checkAndSetCooldown = (cmdName) => {
+    // Fungsi Cooldown Check (10 Detik, Countdown ganti angka, Auto-Delete)
+    const checkAndSetCooldown = async (cmdName) => {
         if (isOwner) return false; // Owner bebas cooldown
         const now = Date.now();
         const cooldownAmount = 10000; // 10 detik dalam milidetik
@@ -198,7 +198,26 @@ client.on(Events.MessageCreate, async (message) => {
         if (timestamps && timestamps.has(userId)) {
             const expirationTime = timestamps.get(userId) + cooldownAmount;
             if (now < expirationTime) {
-                return Math.ceil((expirationTime - now) / 1000); // return sisa detik
+                let secondsLeft = Math.ceil((expirationTime - now) / 1000);
+                
+                // Kirim pesan awal countdown
+                const cdMsg = await message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${secondsLeft} detik** lagi.`);
+
+                // Interval untuk mengubah angka setiap 1 detik
+                const interval = setInterval(() => {
+                    secondsLeft -= 1;
+                    if (secondsLeft > 0) {
+                        cdMsg.edit(`⏳ Tahan tongkat sihirmu! Harap tunggu **${secondsLeft} detik** lagi.`).catch(() => {});
+                    }
+                }, 1000);
+
+                // Hapus pesan setelah 10 detik
+                setTimeout(() => {
+                    clearInterval(interval);
+                    cdMsg.delete().catch(() => {});
+                }, cooldownAmount);
+
+                return true; // Menandakan cooldown aktif
             }
         }
         
@@ -540,11 +559,9 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [formatToss] });
         }
 
-        // --- CEK COOLDOWN 10 DETIK LANGSUNG DI SINI ---
-        const cdRemaining = checkAndSetCooldown('toss');
-        if (cdRemaining) {
-            return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum melakukan Coffin Toss berikutnya.`);
-        }
+        // --- CEK COOLDOWN 10 DETIK & COUNTDOWN ---
+        const isCooldown = await checkAndSetCooldown('toss');
+        if (isCooldown) return;
 
         // Cek Maksimal Bet Limit
         if (betAmount > MAX_BET_LIMIT) {
@@ -634,11 +651,9 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [formatSlot] });
         }
 
-        // --- CEK COOLDOWN 10 DETIK LANGSUNG DI SINI ---
-        const cdRemaining = checkAndSetCooldown('slot');
-        if (cdRemaining) {
-            return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum memutar Mesin Slot berikutnya.`);
-        }
+        // --- CEK COOLDOWN 10 DETIK & COUNTDOWN ---
+        const isCooldown = await checkAndSetCooldown('slot');
+        if (isCooldown) return;
 
         // Cek Maksimal Bet Limit
         if (betAmount > MAX_BET_LIMIT) {
@@ -735,11 +750,9 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [formatG] });
         }
 
-        // --- CEK COOLDOWN 10 DETIK LANGSUNG DI SINI ---
-        const cdRemaining = checkAndSetCooldown('gobs');
-        if (cdRemaining) {
-            return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum melempar dadu Gobstones berikutnya.`);
-        }
+        // --- CEK COOLDOWN 10 DETIK & COUNTDOWN ---
+        const isCooldown = await checkAndSetCooldown('gobs');
+        if (isCooldown) return;
 
         // Cek Maksimal Bet Limit
         if (betAmount > MAX_BET_LIMIT) {
@@ -832,11 +845,9 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [formatS] });
         }
 
-        // --- CEK COOLDOWN 10 DETIK LANGSUNG DI SINI ---
-        const cdRemaining = checkAndSetCooldown('snap');
-        if (cdRemaining) {
-            return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum memulai permainan Exploding Snap berikutnya.`);
-        }
+        // --- CEK COOLDOWN 10 DETIK & COUNTDOWN ---
+        const isCooldown = await checkAndSetCooldown('snap');
+        if (isCooldown) return;
 
         // Cek Maksimal Bet Limit
         if (betAmount > MAX_BET_LIMIT) {
@@ -1004,11 +1015,9 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [formatSn] });
         }
 
-        // --- CEK COOLDOWN 10 DETIK LANGSUNG DI SINI ---
-        const cdRemaining = checkAndSetCooldown('snitch');
-        if (cdRemaining) {
-            return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum mengejar Golden Snitch berikutnya.`);
-        }
+        // --- CEK COOLDOWN 10 DETIK & COUNTDOWN ---
+        const isCooldown = await checkAndSetCooldown('snitch');
+        if (isCooldown) return;
 
         // Cek Maksimal Bet Limit
         if (betAmount > MAX_BET_LIMIT) {
