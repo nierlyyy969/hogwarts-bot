@@ -209,7 +209,10 @@ client.on(Events.MessageCreate, async (message) => {
                     name: '🎲 Kasino Sihir & Perjudian (Gambling)', 
                     value: 
                         '`!toss <jumlah>`  — Coffin Toss, koin naga berhadiah x2 (Snitch/Bludger).\n' +
-                        '`!slot <jumlah>`  — Mesin Slot Gringotts, putar gulungan animasi & jackpot!'
+                        '`!slot <jumlah>`  — Mesin Slot Gringotts, putar gulungan animasi & jackpot!\n' +
+                        '`!gobstones <jumlah> <besar/kecil>` — Tebak Dadu Gobstones Beracun (x2 hadiah).\n' +
+                        '`!snap <jumlah>`  — Exploding Snap, kumpulkan angka kartu hingga 21 (x2 hadiah).\n' +
+                        '`!snitch <jumlah> <angka 1-10>` — Tangkap Golden Snitch, tebak angka keberuntungan (x5 hadiah)!'
                 },
                 { 
                     name: '👑 Admin / Lord Command', 
@@ -292,7 +295,7 @@ client.on(Events.MessageCreate, async (message) => {
 
     // Blokir command umum jika belum mendapat role kelas asrama
     if (!isSorted && !isOwner) {
-        if (['!profile', '!leaderboard', '!student', '!absen', '!cash', '!send', '!toss', '!slot'].some(cmd => command.startsWith(cmd))) {
+        if (['!profile', '!leaderboard', '!student', '!absen', '!cash', '!send', '!toss', '!slot', '!gobstones', '!snap', '!snitch'].some(cmd => command.startsWith(cmd))) {
             const blockedEmbed = new EmbedBuilder()
                 .setColor(EMBED_COLOR)
                 .setTitle('❌ Akses Ditolak!')
@@ -497,7 +500,7 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     // ==========================================
-    // MINI-GAMES CASINO SIHIR (Toss & Slot)
+    // MINI-GAMES CASINO SIHIR KLASIK (Toss & Slot)
     // ==========================================
     if (command === '!toss') {
         const betAmount = parseInt(args[1]);
@@ -599,7 +602,6 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [poorSlot] });
         }
 
-        // Tampilan Animasi Rolling Awal Estetik
         const createSlotEmbed = (s1, s2, s3, text) => {
             return new EmbedBuilder()
                 .setColor(EMBED_COLOR)
@@ -612,23 +614,20 @@ client.on(Events.MessageCreate, async (message) => {
             embeds: [createSlotEmbed('🌀', '🌀', '🌀', '*Mantra gulungan mesin slot mulai berputar...* 🌀')] 
         });
 
-        // Menentukan Hasil Akhir dan Jackpot (Probabilitas)
         const rollRng = Math.random();
         const items = ['🏺', '🧹', '🎩', '🪙'];
         let rolled1, rolled2, rolled3;
         let multiplier = 0;
 
         if (rollRng < 0.75) {
-            // 75% Gagal (Gambar Beda Semua)
             rolled1 = items[Math.floor(Math.random() * items.length)];
             do { rolled2 = items[Math.floor(Math.random() * items.length)]; } while (rolled2 === rolled1);
             do { rolled3 = items[Math.floor(Math.random() * items.length)]; } while (rolled3 === rolled1 || rolled3 === rolled2);
-        } else if (rollRng < 0.87) { rolled1 = '🏺'; rolled2 = '🏺'; rolled3 = '🏺'; multiplier = 5; } // 12% Kuali (x5)
-        else if (rollRng < 0.92) { rolled1 = '🧹'; rolled2 = '🧹'; rolled3 = '🧹'; multiplier = 10; } // 5% Sapu (x10)
-        else if (rollRng < 0.94) { rolled1 = '🎩'; rolled2 = '🎩'; rolled3 = '🎩'; multiplier = 15; } // 2% Topi (x15)
-        else { rolled1 = '🪙'; rolled2 = '🪙'; rolled3 = '🪙'; multiplier = 30; } // 1% Jackpot (x30)
+        } else if (rollRng < 0.87) { rolled1 = '🏺'; rolled2 = '🏺'; rolled3 = '🏺'; multiplier = 5; } 
+        else if (rollRng < 0.92) { rolled1 = '🧹'; rolled2 = '🧹'; rolled3 = '🧹'; multiplier = 10; } 
+        else if (rollRng < 0.94) { rolled1 = '🎩'; rolled2 = '🎩'; rolled3 = '🎩'; multiplier = 15; } 
+        else { rolled1 = '🪙'; rolled2 = '🪙'; rolled3 = '🪙'; multiplier = 30; } 
 
-        // Urutan Animasi Berhenti (Edit Beruntun Bertahap)
         setTimeout(() => {
             slotMsg.edit({ 
                 embeds: [createSlotEmbed(rolled1, '🌀', '🌀', '*Slot pertama terkunci...* 🔒')] 
@@ -647,7 +646,7 @@ client.on(Events.MessageCreate, async (message) => {
                 await userDoc.save();
             } else {
                 userDoc.galleons -= betAmount;
-                userDoc.houseVault = (userDoc.houseVault || 0) + betAmount; // Masuk ke Kas Asrama
+                userDoc.houseVault = (userDoc.houseVault || 0) + betAmount; 
                 await userDoc.save();
             }
 
@@ -662,6 +661,189 @@ client.on(Events.MessageCreate, async (message) => {
                 embeds: [createSlotEmbed(rolled1, rolled2, rolled3, resultText)] 
             });
         }, 3600); 
+
+        return;
+    }
+
+    // ==========================================
+    // MINI-GAMES KASINO SIHIR BARU (Gobstones, Snap, Snitch)
+    // ==========================================
+    if (command === '!gobstones') {
+        const betAmount = parseInt(args[1]);
+        const guess = args[2] ? args[2].toLowerCase() : '';
+
+        if (isNaN(betAmount) || betAmount <= 0 || (guess !== 'besar' && guess !== 'kecil')) {
+            const formatG = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🔮 Format Dadu Gobstones Salah')
+                .setDescription('Gunakan format:\n`!gobstones <jumlah_galleon> <besar/kecil>`\n*(Contoh: `!gobstones 50 besar`)*\n\nBesar: Total dadu 8-12\nKecil: Total dadu 2-7')
+                .setTimestamp();
+            return message.channel.send({ embeds: [formatG] });
+        }
+
+        let userDoc = await User.findOne({ userId, guildId: message.guild.id });
+        if (!userDoc || (userDoc.galleons || 0) < betAmount) {
+            const poorG = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🪙 Saldo Tidak Cukup')
+                .setDescription(`Tabunganmu tidak mencukupi bertaruh Gobstones sebesar **${betAmount.toLocaleString()} G**.\nSaldo saat ini: **${(userDoc ? userDoc.galleons : 0).toLocaleString()} G**`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [poorG] });
+        }
+
+        // Animasi melempar dadu
+        const msg = await message.channel.send({
+            embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle('🎲 Mengocok Dadu Gobstones...').setDescription('Dadu ajaib sedang dilempar ke arena...').setTimestamp()]
+        });
+
+        setTimeout(async () => {
+            const dice1 = Math.floor(Math.random() * 6) + 1;
+            const dice2 = Math.floor(Math.random() * 6) + 1;
+            const total = dice1 + dice2;
+            const resultActual = (total >= 8) ? 'besar' : 'kecil';
+
+            let resultText = '';
+            if (guess === resultActual) {
+                userDoc.galleons += betAmount; 
+                await userDoc.save();
+                resultText = `🎉 **Menang!** Dadu menunjukkan angka **${dice1}** dan **${dice2}** (Total: ${total}). Tebakanmu tepat!\n\nHadiah: **+${(betAmount * 2).toLocaleString()} Galleons**`;
+            } else {
+                userDoc.galleons -= betAmount;
+                userDoc.houseVault = (userDoc.houseVault || 0) + betAmount; 
+                await userDoc.save();
+                resultText = `💥 **Kena Semprot!** Dadu menunjukkan angka **${dice1}** dan **${dice2}** (Total: ${total}). Tebakanmu meleset, Gobstones menyemprotkan cairan bau!\n\nTaruhan hangus: **-${betAmount.toLocaleString()} Galleons** masuk ke Kas Asrama.`;
+            }
+
+            const embedG = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('✨ Hasil Gobstones Risk')
+                .setDescription(`Taruhan: **${betAmount.toLocaleString()} G** | Pilihan: **${guess.toUpperCase()}**\n\n${resultText}`)
+                .setTimestamp();
+            
+            await msg.edit({ embeds: [embedG] });
+        }, 2000);
+
+        return;
+    }
+
+    if (command === '!snap') {
+        const betAmount = parseInt(args[1]);
+
+        if (isNaN(betAmount) || betAmount <= 0) {
+            const formatS = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🔮 Format Exploding Snap Salah')
+                .setDescription('Gunakan format:\n`!snap <jumlah_galleon>`\n*(Contoh: `!snap 100`)*')
+                .setTimestamp();
+            return message.channel.send({ embeds: [formatS] });
+        }
+
+        let userDoc = await User.findOne({ userId, guildId: message.guild.id });
+        if (!userDoc || (userDoc.galleons || 0) < betAmount) {
+            const poorS = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🪙 Saldo Tidak Cukup')
+                .setDescription(`Tabunganmu tidak mencukupi bermain Exploding Snap sebesar **${betAmount.toLocaleString()} G**.\nSaldo saat ini: **${(userDoc ? userDoc.galleons : 0).toLocaleString()} G**`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [poorS] });
+        }
+
+        const msg = await message.channel.send({
+            embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle('🃏 Mengocok Kartu Sihir...').setDescription('Membagi tumpukan kartu sihir panas...').setTimestamp()]
+        });
+
+        setTimeout(async () => {
+            let card1 = Math.floor(Math.random() * 10) + 1;
+            let card2 = Math.floor(Math.random() * 10) + 1;
+            let total = card1 + card2;
+
+            // Memutuskan ambil kartu ke-3 atau tidak (50% peluang)
+            let extraCardText = '';
+            if (Math.random() > 0.5 && total < 22) {
+                const card3 = Math.floor(Math.random() * 8) + 1;
+                total += card3;
+                extraCardText = `\nKartu ketiga menyusul bernilai **${card3}**.`;
+            }
+
+            let resultText = '';
+            if (total === 21) {
+                userDoc.galleons += (betAmount * 2); 
+                await userDoc.save();
+                resultText = `🎉 **SNAP BINGO (21)!** Kartumu: [${card1}] + [${card2}]${extraCardText} (Total: **${total}**). Kartu meledak tepat di batas!\n\nHadiah: **+${(betAmount * 3).toLocaleString()} Galleons**`;
+            } else if (total < 21) {
+                userDoc.galleons += betAmount; 
+                await userDoc.save();
+                resultText = `⭐ **Aman Terkendali!** Kartumu: [${card1}] + [${card2}]${extraCardText} (Total: **${total}**). Kartu tidak meledak, mendekati angka 21!\n\nHadiah: **+${(betAmount * 2).toLocaleString()} Galleons**`;
+            } else {
+                userDoc.galleons -= betAmount;
+                userDoc.houseVault = (userDoc.houseVault || 0) + betAmount; 
+                await userDoc.save();
+                resultText = `💥 **KARTU MELEDAK (BUST)!** Kartumu: [${card1}] + [${card2}]${extraCardText} (Total: **${total}**). Angka melebih batas 21, kartunya meledak berasap!\n\nTaruhan hangus: **-${betAmount.toLocaleString()} G** masuk ke Kas Asrama.`;
+            }
+
+            const embedS = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🃏 Hasil Exploding Snap')
+                .setDescription(`Taruhan: **${betAmount.toLocaleString()} G**\n\n${resultText}`)
+                .setTimestamp();
+            
+            await msg.edit({ embeds: [embedS] });
+        }, 2500);
+
+        return;
+    }
+
+    if (command === '!snitch') {
+        const betAmount = parseInt(args[1]);
+        const guessNumber = parseInt(args[2]);
+
+        if (isNaN(betAmount) || betAmount <= 0 || isNaN(guessNumber) || guessNumber < 1 || guessNumber > 10) {
+            const formatSn = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🔮 Format Tangkap Snitch Salah')
+                .setDescription('Gunakan format:\n`!snitch <jumlah_galleon> <angka 1-10>`\n*(Contoh: `!snitch 200 7`)*')
+                .setTimestamp();
+            return message.channel.send({ embeds: [formatSn] });
+        }
+
+        let userDoc = await User.findOne({ userId, guildId: message.guild.id });
+        if (!userDoc || (userDoc.galleons || 0) < betAmount) {
+            const poorSn = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🪙 Saldo Tidak Cukup')
+                .setDescription(`Tabunganmu tidak mencukupi untuk menangkap Snitch sebesar **${betAmount.toLocaleString()} G**.\nSaldo saat ini: **${(userDoc ? userDoc.galleons : 0).toLocaleString()} G**`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [poorSn] });
+        }
+
+        const msg = await message.channel.send({
+            embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle('⚡ Mengejar Golden Snitch...').setDescription('Mantra melesat cepat, bola bersayap emas terbang kesana kemari...').setTimestamp()]
+        });
+
+        setTimeout(async () => {
+            const targetNumber = Math.floor(Math.random() * 10) + 1;
+            const wingColor = Math.random() > 0.5 ? '🟡 Sayap Emas' : '⚪ Sayap Perak';
+
+            let resultText = '';
+            if (guessNumber === targetNumber) {
+                userDoc.galleons += (betAmount * 5); 
+                await userDoc.save();
+                resultText = `🏆 **JACKPOT SNITCH!** Sayap: ${wingColor}. Tebakanmu tepat mengenai angka **${targetNumber}** di udara!\n\nHadiah Jackpot (x5): **+${(betAmount * 6).toLocaleString()} Galleons**`;
+            } else {
+                userDoc.galleons -= betAmount;
+                userDoc.houseVault = (userDoc.houseVault || 0) + betAmount; 
+                await userDoc.save();
+                resultText = `❌ **Meleset!** Sayap: ${wingColor}. Snitch menghindar ke angka **${targetNumber}**. Sayang sekali kamu tidak berhasil menangkapnya.\n\nTaruhan hangus: **-${betAmount.toLocaleString()} G** masuk ke Kas Asrama.`;
+            }
+
+            const embedSn = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('✨ Hasil Golden Snitch Catch')
+                .setDescription(`Taruhan: **${betAmount.toLocaleString()} G** | Pilihan Angka: **${guessNumber}**\n\n${resultText}`)
+                .setTimestamp();
+            
+            await msg.edit({ embeds: [embedSn] });
+        }, 3000);
 
         return;
     }
