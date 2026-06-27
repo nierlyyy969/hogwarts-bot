@@ -238,7 +238,7 @@ client.on(Events.MessageCreate, async (message) => {
 
         const embed = new EmbedBuilder()
             .setColor(EMBED_COLOR) 
-            .setTitle('🎩 The Sorting Hat')
+            .setTitle('The Sorting Hat')
             .setDescription('Welcome to **Hogwarts Academy**\n\nSilahkan tekan tombol di bawah dan biarkan Sorting Hat menentukan kelasmu!');
 
         const row = new ActionRowBuilder().addComponents(
@@ -505,11 +505,11 @@ client.on(Events.MessageCreate, async (message) => {
             let resultDesc = `Koin naga berputar...\nKoin mendarat pada sisi: **${botChoice === 'snitch' ? '🟡 Snitch Emas' : '🔴 Bludger'}**\n\n`;
 
             if (playerPick === botChoice) {
-                userDoc.galleons += betAmount; // Menang x2 (modal kembali + untung setara)
+                userDoc.galleons += betAmount; 
                 await userDoc.save();
                 resultDesc += `🎉 **Kemenangan Hebat!** Tebakanmu tepat. Saldo Galleon bertambah **+${betAmount.toLocaleString()} G**!`;
             } else {
-                userDoc.galleons -= betAmount; // Kalah (potong modal)
+                userDoc.galleons -= betAmount; 
                 await userDoc.save();
                 resultDesc += `❌ **Sayang Sekali!** Tebakanmu meleset. Saldo Galleon terpotong **-${betAmount.toLocaleString()} G**!`;
             }
@@ -558,73 +558,70 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [poorSlot] });
         }
 
-        // Tampilan Animasi Rolling Awal
-        const slotEmbed = new EmbedBuilder()
-            .setColor(EMBED_COLOR)
-            .setTitle('🎰 Gringotts Vault - Mesin Slot Sihir')
-            .setDescription(`Taruhan: **${betAmount.toLocaleString()} Galleons**\n\n**[ 🏺 Kuali | 🧹 Sapu | 🎩 Topi ]**\n*Mantra gulungan mesin slot sedang berputar...* 🌀`)
-            .setTimestamp();
+        // Tampilan Animasi Rolling Awal Estetik
+        const createSlotEmbed = (s1, s2, s3, text) => {
+            return new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🎰 Gringotts Vault - Mesin Slot Sihir')
+                .setDescription(`Taruhan: **${betAmount.toLocaleString()} Galleons**\n\n**[  ${s1}  |  ${s2}  |  ${s3}  ]**\n\n${text}`)
+                .setTimestamp();
+        };
 
-        const slotMsg = await message.channel.send({ embeds: [slotEmbed] });
+        const slotMsg = await message.channel.send({ 
+            embeds: [createSlotEmbed('🌀', '🌀', '🌀', '*Mantra gulungan mesin slot mulai berputar...* 🌀')] 
+        });
 
-        // Peluang / Probabilitas Mesin Slot Gringotts
+        // Menentukan Hasil Akhir dan Jackpot (Probabilitas)
         const rollRng = Math.random();
+        const items = ['🏺', '🧹', '🎩', '🪙'];
         let rolled1, rolled2, rolled3;
         let multiplier = 0;
 
-        // Simulasi gulungan mesin berputar selama 2.5 detik
+        if (rollRng < 0.75) {
+            // 75% Gagal (Gambar Beda Semua)
+            rolled1 = items[Math.floor(Math.random() * items.length)];
+            do { rolled2 = items[Math.floor(Math.random() * items.length)]; } while (rolled2 === rolled1);
+            do { rolled3 = items[Math.floor(Math.random() * items.length)]; } while (rolled3 === rolled1 || rolled3 === rolled2);
+        } else if (rollRng < 0.87) { rolled1 = '🏺'; rolled2 = '🏺'; rolled3 = '🏺'; multiplier = 5; } // 12% Kuali (x5)
+        else if (rollRng < 0.92) { rolled1 = '🧹'; rolled2 = '🧹'; rolled3 = '🧹'; multiplier = 10; } // 5% Sapu (x10)
+        else if (rollRng < 0.94) { rolled1 = '🎩'; rolled2 = '🎩'; rolled3 = '🎩'; multiplier = 15; } // 2% Topi (x15)
+        else { rolled1 = '🪙'; rolled2 = '🪙'; rolled3 = '🪙'; multiplier = 30; } // 1% Jackpot (x30)
+
+        // Urutan Animasi Berhenti (Edit Beruntun Bertahap)
+        setTimeout(() => {
+            slotMsg.edit({ 
+                embeds: [createSlotEmbed(rolled1, '🌀', '🌀', '*Slot pertama terkunci...* 🔒')] 
+            });
+        }, 1200);
+
+        setTimeout(() => {
+            slotMsg.edit({ 
+                embeds: [createSlotEmbed(rolled1, rolled2, '🌀', '*Slot kedua terkunci...* 🔒')] 
+            });
+        }, 2400);
+
         setTimeout(async () => {
-            if (rollRng < 0.75) {
-                // 75% Gagal (Gambar Beda Semua)
-                const items = ['🏺', '🧹', '🎩', '🪙'];
-                rolled1 = items[Math.floor(Math.random() * items.length)];
-                do { rolled2 = items[Math.floor(Math.random() * items.length)]; } while (rolled2 === rolled1);
-                do { rolled3 = items[Math.floor(Math.random() * items.length)]; } while (rolled3 === rolled1 || rolled3 === rolled2);
-                
+            if (multiplier > 0) {
+                userDoc.galleons += (betAmount * multiplier) - betAmount;
+                await userDoc.save();
+            } else {
                 userDoc.galleons -= betAmount;
                 userDoc.houseVault = (userDoc.houseVault || 0) + betAmount; // Masuk ke Kas Asrama
                 await userDoc.save();
-            } else if (rollRng < 0.87) {
-                // 12% 3x Kuali (🏺🏺🏺) - Hadiah x5
-                rolled1 = '🏺'; rolled2 = '🏺'; rolled3 = '🏺';
-                multiplier = 5;
-                userDoc.galleons += (betAmount * multiplier) - betAmount;
-                await userDoc.save();
-            } else if (rollRng < 0.92) {
-                // 5% 3x Sapu Terbang (🧹🧹🧹) - Hadiah x10
-                rolled1 = '🧹'; rolled2 = '🧹'; rolled3 = '🧹';
-                multiplier = 10;
-                userDoc.galleons += (betAmount * multiplier) - betAmount;
-                await userDoc.save();
-            } else if (rollRng < 0.94) {
-                // 2% 3x Topi Seleksi (🎩🎩🎩) - Hadiah x15
-                rolled1 = '🎩'; rolled2 = '🎩'; rolled3 = '🎩';
-                multiplier = 15;
-                userDoc.galleons += (betAmount * multiplier) - betAmount;
-                await userDoc.save();
-            } else {
-                // 1% Jackpot 3x Galleon Emas (🪙🪙🪙) - Hadiah x30
-                rolled1 = '🪙'; rolled2 = '🪙'; rolled3 = '🪙';
-                multiplier = 30;
-                userDoc.galleons += (betAmount * multiplier) - betAmount;
-                await userDoc.save();
             }
 
-            let resultText = `Gulungan berhenti pada:\n\n **[  ${rolled1}  |  ${rolled2}  |  ${rolled3}  ]**\n\n`;
+            let resultText = '';
             if (multiplier > 0) {
-                resultText += `🎉 **JACKPOT (x${multiplier})!** Selamat, kamu memenangkan **+${(betAmount * multiplier).toLocaleString()} Galleons**!`;
+                resultText = `🎉 **JACKPOT (x${multiplier})!** Selamat, murid yang luar biasa! Kamu memenangkan **+${(betAmount * multiplier).toLocaleString()} Galleons**!`;
             } else {
-                resultText += `💸 Zonk! Gambar tidak ada yang kembar.\nTaruhan hangus dan ditambahkan ke **Pundi-pundi Kas Asrama**!`;
+                resultText = `💸 Zonk! Gulungan tidak ada yang kembar.\nTaruhan hangus dan berhasil disetorkan ke **Pundi-pundi Kas Asrama**!`;
             }
 
-            const resultSlotEmbed = new EmbedBuilder()
-                .setColor(EMBED_COLOR)
-                .setTitle('🎰 Hasil Mesin Slot Gringotts')
-                .setDescription(resultText)
-                .setTimestamp();
+            slotMsg.edit({ 
+                embeds: [createSlotEmbed(rolled1, rolled2, rolled3, resultText)] 
+            });
+        }, 3600); 
 
-            await slotMsg.edit({ embeds: [resultSlotEmbed] });
-        }, 2500); 
         return;
     }
 
