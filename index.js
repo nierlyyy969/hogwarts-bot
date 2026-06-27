@@ -435,7 +435,7 @@ client.on(Events.MessageCreate, async (message) => {
             const formatSendEmbed = new EmbedBuilder()
                 .setColor(EMBED_COLOR)
                 .setTitle('🔮 Format Pengiriman Galleon Salah')
-                .setDescription('Gunakan format yang benar:\n`!send @User <jumlah_galleon>`\n*(Contoh: `!send @Harry 50`)*')
+                .setDescription('Gunakan format:\n`!send @User <jumlah_galleon>`\n*(Contoh: `!send @Harry 50`)*')
                 .setTimestamp();
             return message.channel.send({ embeds: [formatSendEmbed] });
         }
@@ -540,6 +540,12 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [formatToss] });
         }
 
+        // Cek Cooldown 5 Detik Ditaruh Paling Atas
+        const cdRemaining = checkAndSetCooldown('toss');
+        if (cdRemaining) {
+            return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum melakukan Coffin Toss berikutnya.`);
+        }
+
         // Cek Maksimal Bet Limit
         if (betAmount > MAX_BET_LIMIT) {
             const maxLvlErr = new EmbedBuilder()
@@ -548,12 +554,6 @@ client.on(Events.MessageCreate, async (message) => {
                 .setDescription(`Taruhan maksimal untuk Coffin Toss adalah **${MAX_BET_LIMIT.toLocaleString()} Galleons**!`)
                 .setTimestamp();
             return message.channel.send({ embeds: [maxLvlErr] });
-        }
-
-        // Cek Cooldown 5 Detik
-        const cdRemaining = checkAndSetCooldown('toss');
-        if (cdRemaining) {
-            return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum melakukan Coffin Toss berikutnya.`);
         }
 
         let userDoc = await User.findOne({ userId, guildId: message.guild.id });
@@ -634,6 +634,12 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [formatSlot] });
         }
 
+        // Cek Cooldown 5 Detik Ditaruh Paling Atas
+        const cdRemaining = checkAndSetCooldown('slot');
+        if (cdRemaining) {
+            return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum memutar Mesin Slot berikutnya.`);
+        }
+
         // Cek Maksimal Bet Limit
         if (betAmount > MAX_BET_LIMIT) {
             const maxLvlErr = new EmbedBuilder()
@@ -642,12 +648,6 @@ client.on(Events.MessageCreate, async (message) => {
                 .setDescription(`Taruhan maksimal untuk Mesin Slot adalah **${MAX_BET_LIMIT.toLocaleString()} Galleons**!`)
                 .setTimestamp();
             return message.channel.send({ embeds: [maxLvlErr] });
-        }
-
-        // Cek Cooldown 5 Detik
-        const cdRemaining = checkAndSetCooldown('slot');
-        if (cdRemaining) {
-            return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum memutar Mesin Slot berikutnya.`);
         }
 
         let userDoc = await User.findOne({ userId, guildId: message.guild.id });
@@ -735,6 +735,12 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [formatG] });
         }
 
+        // Cek Cooldown 5 Detik Ditaruh Paling Atas
+        const cdRemaining = checkAndSetCooldown('gobs');
+        if (cdRemaining) {
+            return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum melempar dadu Gobstones berikutnya.`);
+        }
+
         // Cek Maksimal Bet Limit
         if (betAmount > MAX_BET_LIMIT) {
             const maxLvlErr = new EmbedBuilder()
@@ -743,12 +749,6 @@ client.on(Events.MessageCreate, async (message) => {
                 .setDescription(`Taruhan maksimal untuk Gobstones Risk adalah **${MAX_BET_LIMIT.toLocaleString()} Galleons**!`)
                 .setTimestamp();
             return message.channel.send({ embeds: [maxLvlErr] });
-        }
-
-        // Cek Cooldown 5 Detik
-        const cdRemaining = checkAndSetCooldown('gobs');
-        if (cdRemaining) {
-            return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum melempar dadu Gobstones berikutnya.`);
         }
 
         let userDoc = await User.findOne({ userId, guildId: message.guild.id });
@@ -832,6 +832,12 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [formatS] });
         }
 
+        // Cek Cooldown 5 Detik Ditaruh Paling Atas
+        const cdRemaining = checkAndSetCooldown('snap');
+        if (cdRemaining) {
+            return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum memulai permainan Exploding Snap berikutnya.`);
+        }
+
         // Cek Maksimal Bet Limit
         if (betAmount > MAX_BET_LIMIT) {
             const maxLvlErr = new EmbedBuilder()
@@ -840,12 +846,6 @@ client.on(Events.MessageCreate, async (message) => {
                 .setDescription(`Taruhan maksimal untuk Exploding Snap adalah **${MAX_BET_LIMIT.toLocaleString()} Galleons**!`)
                 .setTimestamp();
             return message.channel.send({ embeds: [maxLvlErr] });
-        }
-
-        // Cek Cooldown 5 Detik
-        const cdRemaining = checkAndSetCooldown('snap');
-        if (cdRemaining) {
-            return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum memulai permainan Exploding Snap berikutnya.`);
         }
 
         let userDoc = await User.findOne({ userId, guildId: message.guild.id });
@@ -1004,6 +1004,12 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [formatSn] });
         }
 
+        // Cek Cooldown 5 Detik Ditaruh Paling Atas
+        const cdRemaining = checkAndSetCooldown('snitch');
+        if (cdRemaining) {
+            return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum mengejar Golden Snitch berikutnya.`);
+        }
+
         // Cek Maksimal Bet Limit
         if (betAmount > MAX_BET_LIMIT) {
             const maxLvlErr = new EmbedBuilder()
@@ -1012,12 +1018,6 @@ client.on(Events.MessageCreate, async (message) => {
                 .setDescription(`Taruhan maksimal untuk Golden Snitch Catch adalah **${MAX_BET_LIMIT.toLocaleString()} Galleons**!`)
                 .setTimestamp();
             return message.channel.send({ embeds: [maxLvlErr] });
-        }
-
-        // Cek Cooldown 5 Detik
-        const cdRemaining = checkAndSetCooldown('snitch');
-        if (cdRemaining) {
-            return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum mengejar Golden Snitch berikutnya.`);
         }
 
         let userDoc = await User.findOne({ userId, guildId: message.guild.id });
