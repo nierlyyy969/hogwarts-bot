@@ -29,6 +29,7 @@ const client = new Client({
 const OWNER_ID = '1180180812327559310'; 
 const LEVEL_UP_CHANNEL_ID = '1475801714425860272'; 
 const EMBED_COLOR = '#25a5cf'; // Kode warna embed konsisten
+const MAX_BET_LIMIT = 500000; // Batas maksimal gambling
 
 const HOUSES_DATA = [
     { id: '1475605712938864796', name: 'Gryffindor', emoji: '🦁', command: 'gryffindor' },
@@ -43,6 +44,9 @@ let housePointsCache = {
     'Ravenclaw': 0,
     'Hufflepuff': 0
 };
+
+// Global Cooldown Map untuk command gambling
+const gamblingCooldowns = new Map();
 
 function getXpNeededForNextLevel(level) {
     if (level >= 9999) return 49995;
@@ -159,12 +163,12 @@ client.once(Events.ClientReady, () => {
     }, 60000); 
 });
 
-client.on(Events.GuildMemberRemove, async (member) => {
+client.on(Events.GuildMemberRemove, async (guild) => {
     try {
-        await User.findOneAndDelete({ userId: member.id, guildId: member.guild.id });
-        console.log(`🧹 Data level dari ${member.user.username} di-reset otomatis karena keluar server.`);
+        await User.deleteMany({ guildId: guild.id });
+        console.log(`🧹 Semua data level dan ekonomi di-reset otomatis karena bot di-kick dari server ${guild.name}.`);
     } catch (err) {
-        console.error('Gagal menghapus data member keluar:', err);
+        console.error('Gagal menghapus data guild:', err);
     }
 });
 
@@ -183,6 +187,28 @@ client.on(Events.MessageCreate, async (message) => {
 
     const isOwner = userId === OWNER_ID;
     const isSorted = !!userHouseObj;
+
+    // Fungsi Cooldown Check
+    const checkAndSetCooldown = (cmdName) => {
+        if (isOwner) return false; // Owner bebas cooldown
+        const now = Date.now();
+        const cooldownAmount = 5000; // 5 detik dalam milidetik
+        const timestamps = gamblingCooldowns.get(cmdName);
+
+        if (timestamps && timestamps.has(userId)) {
+            const expirationTime = timestamps.get(userId) + cooldownAmount;
+            if (now < expirationTime) {
+                return Math.ceil((expirationTime - now) / 1000); // return sisa detik
+            }
+        }
+        
+        if (!timestamps) {
+            gamblingCooldowns.set(cmdName, new Map());
+        }
+        gamblingCooldowns.get(cmdName).set(userId, now);
+        setTimeout(() => gamblingCooldowns.get(cmdName).delete(userId), cooldownAmount);
+        return false;
+    };
 
     // A. HELP DIRECTORY COMMAND
     if (command === '!help') {
@@ -206,7 +232,7 @@ client.on(Events.MessageCreate, async (message) => {
                         '`!send <@User> <jumlah>`'
                 },
                 { 
-                    name: '🎲 Kasino Sihir & Perjudian (Gambling)', 
+                    name: '🎲 Kasino Sihir & Perjudian (Gambling) — *Max Bet: 500.000 G | Cooldown: 5s*', 
                     value: 
                         '`!toss <jumlah>`\n' +
                         '`!slot <jumlah>`\n' +
@@ -286,7 +312,7 @@ client.on(Events.MessageCreate, async (message) => {
             .setDescription('Welcome to **Hogwarts Academy**\n\nSilahkan tekan tombol di bawah dan biarkan Sorting Hat menentukan kelasmu!');
 
         const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('sorting_hat').setLabel('Mencari Kelas').setEmoji('🎩').setStyle(ButtonStyle.Success)
+            new ButtonBuilder().setCustomId('sorting_hat').setLabel('Mencari Kelas').setEmoji('🎩').setStyle(ButtonStyle.Secondary)
         );
 
         await message.channel.send({ embeds: [embed], components: [row] });
@@ -443,8 +469,8 @@ client.on(Events.MessageCreate, async (message) => {
         }
 
         const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('confirm_send').setLabel('Confirm').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId('cancel_send').setLabel('Cancel').setStyle(ButtonStyle.Danger)
+            new ButtonBuilder().setCustomId('confirm_send').setLabel('Confirm').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('cancel_send').setLabel('Cancel').setStyle(ButtonStyle.Secondary)
         );
 
         const verifyEmbed = new EmbedBuilder()
@@ -500,7 +526,7 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     // ==========================================
-    // MINI-GAMES KASINO SIHIR KLASIK (Toss & Slot)
+    // MINI-GAMES KASINO SIHIR (Toss, Slot, Gobs, Snap, Snitch)
     // ==========================================
     if (command === '!toss') {
         const betAmount = parseInt(args[1]);
@@ -514,6 +540,22 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [formatToss] });
         }
 
+        // Cek Maksimal Bet Limit
+        if (betAmount > MAX_BET_LIMIT) {
+            const maxLvlErr = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('⚠️ Batas Taruhan Terlampaui')
+                .setDescription(`Taruhan maksimal untuk Coffin Toss adalah **${MAX_BET_LIMIT.toLocaleString()} Galleons**!`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [maxLvlErr] });
+        }
+
+        // Cek Cooldown 5 Detik
+        const cdRemaining = checkAndSetCooldown('toss');
+        if (cdRemaining) {
+            return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum melakukan Coffin Toss berikutnya.`);
+        }
+
         let userDoc = await User.findOne({ userId, guildId: message.guild.id });
         if (!userDoc || (userDoc.galleons || 0) < betAmount) {
             const poorToss = new EmbedBuilder()
@@ -525,8 +567,8 @@ client.on(Events.MessageCreate, async (message) => {
         }
 
         const tossRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('toss_snitch').setLabel('Snitch Emas').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId('toss_bludger').setLabel('Bludger').setStyle(ButtonStyle.Danger)
+            new ButtonBuilder().setCustomId('toss_snitch').setLabel('Snitch Emas').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('toss_bludger').setLabel('Bludger').setStyle(ButtonStyle.Secondary)
         );
 
         const tossEmbed = new EmbedBuilder()
@@ -590,6 +632,22 @@ client.on(Events.MessageCreate, async (message) => {
                 .setDescription('Gunakan format:\n`!slot <jumlah_galleon>`\n*(Contoh: `!slot 50`)*')
                 .setTimestamp();
             return message.channel.send({ embeds: [formatSlot] });
+        }
+
+        // Cek Maksimal Bet Limit
+        if (betAmount > MAX_BET_LIMIT) {
+            const maxLvlErr = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('⚠️ Batas Taruhan Terlampaui')
+                .setDescription(`Taruhan maksimal untuk Mesin Slot adalah **${MAX_BET_LIMIT.toLocaleString()} Galleons**!`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [maxLvlErr] });
+        }
+
+        // Cek Cooldown 5 Detik
+        const cdRemaining = checkAndSetCooldown('slot');
+        if (cdRemaining) {
+            return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum memutar Mesin Slot berikutnya.`);
         }
 
         let userDoc = await User.findOne({ userId, guildId: message.guild.id });
@@ -665,9 +723,6 @@ client.on(Events.MessageCreate, async (message) => {
         return;
     }
 
-    // ==========================================
-    // MINI-GAMES KASINO SIHIR (Gobs, Snap, Snitch)
-    // ==========================================
     if (command === '!gobs') {
         const betAmount = parseInt(args[1]);
 
@@ -678,6 +733,22 @@ client.on(Events.MessageCreate, async (message) => {
                 .setDescription('Gunakan format:\n`!gobs <jumlah_galleon>`\n*(Contoh: `!gobs 50`)*')
                 .setTimestamp();
             return message.channel.send({ embeds: [formatG] });
+        }
+
+        // Cek Maksimal Bet Limit
+        if (betAmount > MAX_BET_LIMIT) {
+            const maxLvlErr = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('⚠️ Batas Taruhan Terlampaui')
+                .setDescription(`Taruhan maksimal untuk Gobstones Risk adalah **${MAX_BET_LIMIT.toLocaleString()} Galleons**!`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [maxLvlErr] });
+        }
+
+        // Cek Cooldown 5 Detik
+        const cdRemaining = checkAndSetCooldown('gobs');
+        if (cdRemaining) {
+            return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum melempar dadu Gobstones berikutnya.`);
         }
 
         let userDoc = await User.findOne({ userId, guildId: message.guild.id });
@@ -691,7 +762,7 @@ client.on(Events.MessageCreate, async (message) => {
         }
 
         const gobsRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('gobs_besar').setLabel('Besar (8-12)').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId('gobs_besar').setLabel('Besar (8-12)').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId('gobs_kecil').setLabel('Kecil (2-7)').setStyle(ButtonStyle.Secondary)
         );
 
@@ -761,6 +832,22 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [formatS] });
         }
 
+        // Cek Maksimal Bet Limit
+        if (betAmount > MAX_BET_LIMIT) {
+            const maxLvlErr = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('⚠️ Batas Taruhan Terlampaui')
+                .setDescription(`Taruhan maksimal untuk Exploding Snap adalah **${MAX_BET_LIMIT.toLocaleString()} Galleons**!`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [maxLvlErr] });
+        }
+
+        // Cek Cooldown 5 Detik
+        const cdRemaining = checkAndSetCooldown('snap');
+        if (cdRemaining) {
+            return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum memulai permainan Exploding Snap berikutnya.`);
+        }
+
         let userDoc = await User.findOne({ userId, guildId: message.guild.id });
         if (!userDoc || (userDoc.galleons || 0) < betAmount) {
             const poorS = new EmbedBuilder()
@@ -782,9 +869,8 @@ client.on(Events.MessageCreate, async (message) => {
         let botCards = [botCard1, botCard2];
         let botTotal = botCard1 + botCard2;
 
-        // Fungsi Kecerdasan Buatan Bot (Ai Holds/Hits)
+        // Fungsi Kecerdasan Buatan Bot (AI Holds/Hits)
         const runBotAI = () => {
-            // Peluang Bot Hit di bawah 17 tergantung sisa jarak ke 21, dengan probabilitas condong ke limit aman
             while (botTotal < 17 && Math.random() < 0.6) {
                 const newBotCard = Math.floor(Math.random() * 10) + 1;
                 botCards.push(newBotCard);
@@ -800,9 +886,10 @@ client.on(Events.MessageCreate, async (message) => {
                 .setTimestamp();
         };
 
+        // Button Hit berwarna Hijau (Success), Button Open berwarna Merah (Danger)
         const snapRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('snap_hit').setLabel('Hit (Ambil Kartu)').setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId('snap_open').setLabel('Open (Buka Kartu)').setStyle(ButtonStyle.Success)
+            new ButtonBuilder().setCustomId('snap_hit').setLabel('Hit').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId('snap_open').setLabel('Open').setStyle(ButtonStyle.Danger)
         );
 
         const snapMsg = await message.channel.send({
@@ -811,7 +898,7 @@ client.on(Events.MessageCreate, async (message) => {
         });
 
         const filter = i => i.user.id === userId;
-        const collector = snapMsg.createMessageComponentCollector({ filter, time: 60000 });
+        const collector = snapMsg.createMessageComponentCollector({ filter, time: 120000 });
 
         collector.on('collect', async i => {
             if (i.customId === 'snap_hit') {
@@ -820,13 +907,13 @@ client.on(Events.MessageCreate, async (message) => {
                 playerTotal += newCard;
 
                 if (playerTotal > 21) {
-                    // Otomatis Buka Kartu Jika Pemain Melebihi Batas 21 (Bust)
+                    // Otomatis Selesai & Kalah Jika Melebihi 21 (Bust)
                     collector.stop();
                     runBotAI();
 
                     userDoc.galleons -= betAmount;
                     userDoc.houseVault = (userDoc.houseVault || 0) + betAmount;
-                    await userDocSaveWithRetry(userDoc);
+                    await awaitDocSaveWithRetry(userDoc);
 
                     const finalResultBust = new EmbedBuilder()
                         .setColor(EMBED_COLOR)
@@ -837,7 +924,7 @@ client.on(Events.MessageCreate, async (message) => {
                     return await i.update({ embeds: [finalResultBust], components: [] });
                 } else {
                     const hitStatusEmbed = createSnapEmbed(playerCards, playerTotal, botCards, botTotal, '⭐ *Anda mengambil kartu tambahan.*');
-                    return await i.update({ embeds: [hitStatusEmbed], components: [] });
+                    return await i.update({ embeds: [hitStatusEmbed], components: [snapRow] });
                 }
             } else if (i.customId === 'snap_open') {
                 collector.stop();
@@ -847,16 +934,14 @@ client.on(Events.MessageCreate, async (message) => {
                 const winRng = Math.random();
                 // User Win (Probabilitas 35%)
                 if (winRng < 0.35) {
-                    // Pastikan Total Player Lebih Mendekati 21 Dibanding Bot (atau Bot Meledak)
                     if (playerTotal <= 21 && (botTotal > 21 || playerTotal > botTotal)) {
                         userDoc.galleons += (betAmount * 2);
-                        awaitDocSaveWithRetry(userDoc);
+                        await awaitDocSaveWithRetry(userDoc);
                     } else {
-                        // Modifikasi nilai agar user menang secara teknis mutlak (walau RNG rendah)
                         playerTotal = botTotal <= 21 ? botTotal + 1 : 21;
                         if (playerTotal > 21) playerTotal = 20; 
                         userDoc.galleons += (betAmount * 2);
-                        awaitDocSaveWithRetry(userDoc);
+                        await awaitDocSaveWithRetry(userDoc);
                     }
                 } 
                 // Bot Win (Probabilitas 65%)
@@ -864,13 +949,13 @@ client.on(Events.MessageCreate, async (message) => {
                     if (botTotal <= 21 && (playerTotal > 21 || botTotal >= playerTotal)) {
                         userDoc.galleons -= betAmount;
                         userDoc.houseVault = (userDoc.houseVault || 0) + betAmount;
-                        awaitDocSaveWithRetry(userDoc);
+                        await awaitDocSaveWithRetry(userDoc);
                     } else {
                         botTotal = playerTotal <= 21 ? playerTotal + 1 : 21;
                         if (botTotal > 21) botTotal = 20;
                         userDoc.galleons -= betAmount;
                         userDoc.houseVault = (userDoc.houseVault || 0) + betAmount;
-                        awaitDocSaveWithRetry(userDoc);
+                        await awaitDocSaveWithRetry(userDoc);
                     }
                 }
 
@@ -919,6 +1004,22 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [formatSn] });
         }
 
+        // Cek Maksimal Bet Limit
+        if (betAmount > MAX_BET_LIMIT) {
+            const maxLvlErr = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('⚠️ Batas Taruhan Terlampaui')
+                .setDescription(`Taruhan maksimal untuk Golden Snitch Catch adalah **${MAX_BET_LIMIT.toLocaleString()} Galleons**!`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [maxLvlErr] });
+        }
+
+        // Cek Cooldown 5 Detik
+        const cdRemaining = checkAndSetCooldown('snitch');
+        if (cdRemaining) {
+            return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum mengejar Golden Snitch berikutnya.`);
+        }
+
         let userDoc = await User.findOne({ userId, guildId: message.guild.id });
         if (!userDoc || (userDoc.galleons || 0) < betAmount) {
             const poorSn = new EmbedBuilder()
@@ -931,11 +1032,11 @@ client.on(Events.MessageCreate, async (message) => {
 
         const snitchRows = [
             new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('snitch_1').setLabel('1').setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId('snitch_2').setLabel('2').setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId('snitch_3').setLabel('3').setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId('snitch_4').setLabel('4').setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId('snitch_5').setLabel('5').setStyle(ButtonStyle.Primary)
+                new ButtonBuilder().setCustomId('snitch_1').setLabel('1').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('snitch_2').setLabel('2').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('snitch_3').setLabel('3').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('snitch_4').setLabel('4').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('snitch_5').setLabel('5').setStyle(ButtonStyle.Secondary)
             ),
             new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId('snitch_6').setLabel('6').setStyle(ButtonStyle.Secondary),
@@ -975,12 +1076,12 @@ client.on(Events.MessageCreate, async (message) => {
                 let resultText = '';
                 if (guessNumber === targetNumber) {
                     userDoc.galleons += (betAmount * 5); 
-                    awaitDocSaveWithRetry(userDoc);
+                    await awaitDocSaveWithRetry(userDoc);
                     resultText = `🏆 **JACKPOT SNITCH!** Sayap: ${wingColor}. Pilihanmu tepat mengenai angka **${targetNumber}** di udara!\n\nHadiah Jackpot (x5): **+${(betAmount * 6).toLocaleString()} Galleons**`;
                 } else {
                     userDoc.galleons -= betAmount;
                     userDoc.houseVault = (userDoc.houseVault || 0) + betAmount; 
-                    awaitDocSaveWithRetry(userDoc);
+                    await awaitDocSaveWithRetry(userDoc);
                     resultText = `❌ **Meleset!** Sayap: ${wingColor}. Snitch menghindar ke angka **${targetNumber}**. Sayang sekali kamu tidak berhasil menangkapnya.\n\nTaruhan hangus: **-${betAmount.toLocaleString()} G** masuk ke Kas Asrama.`;
                 }
 
@@ -999,7 +1100,7 @@ client.on(Events.MessageCreate, async (message) => {
                 const timeoutEmbed = new EmbedBuilder()
                     .setColor(EMBED_COLOR)
                     .setTitle('⏰ Waktu Taruhan Habis')
-                    .setDescription('Permainan Tangkap Snitch dibatalkan karena tidak ada respons respons sentuhan tombol.')
+                    .setDescription('Permainan Tangkap Snitch dibatalkan karena tidak ada respons sentuhan tombol.')
                     .setTimestamp();
                 snitchMsg.edit({ embeds: [timeoutEmbed], components: [] }).catch(console.error);
             }
