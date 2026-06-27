@@ -194,32 +194,32 @@ client.on(Events.MessageCreate, async (message) => {
                 { 
                     name: '🏰 Sistem Akademik & Informasi', 
                     value: 
-                        '`!profile`        — Melihat tingkat sihir, gelar, dan progres XP.\n' +
-                        '`!student`        — Roster / daftar murid aktif tiap asrama.\n' +
-                        '`!leaderboard`    — Klasemen turnamen House Cup.'
+                        '`!profile`\n' +
+                        '`!student`\n' +
+                        '`!leaderboard`'
                 },
                 { 
                     name: '🪙 Sistem Keuangan & Dompet (Currency)', 
                     value: 
-                        '`!absen`          — Mengambil tunjangan harian XP & Galleon.\n' +
-                        '`!cash`           — Memeriksa isi dompet sihir & pundi asrama.\n' +
-                        '`!send`           — Mengirimkan Galleon ke sesama murid.'
+                        '`!absen`\n' +
+                        '`!cash`\n' +
+                        '`!send <@User> <jumlah>`'
                 },
                 { 
                     name: '🎲 Kasino Sihir & Perjudian (Gambling)', 
                     value: 
-                        '`!toss <jumlah>`  — Coffin Toss, koin naga berhadiah x2 (Snitch/Bludger).\n' +
-                        '`!slot <jumlah>`  — Mesin Slot Gringotts, putar gulungan animasi & jackpot!\n' +
-                        '`!gobstones <jumlah> <besar/kecil>` — Tebak Dadu Gobstones Beracun (x2 hadiah).\n' +
-                        '`!snap <jumlah>`  — Exploding Snap, kumpulkan angka kartu hingga 21 (x2 hadiah).\n' +
-                        '`!snitch <jumlah> <angka 1-10>` — Tangkap Golden Snitch, tebak angka keberuntungan (x5 hadiah)!'
+                        '`!toss <jumlah>`\n' +
+                        '`!slot <jumlah>`\n' +
+                        '`!gobstones <jumlah> <besar/kecil>`\n' +
+                        '`!snap <jumlah>`\n' +
+                        '`!snitch <jumlah> <angka 1-10>`'
                 },
                 { 
                     name: '👑 Admin / Lord Command', 
                     value: 
-                        '`!sortinghat`     — Memanggil The Sorting Hat (khusus Owner).\n' +
-                        '`!setlevel`       — Memanipulasi tingkat sihir (khusus Owner).\n' +
-                        '`!givepoint`      — Memberikan berkah poin asrama (khusus Owner).'
+                        '`!sortinghat`\n' +
+                        '`!setlevel <@User> <level>`\n' +
+                        '`!givepoint <@User> <poin>`'
                 }
             )
             .setTimestamp()
@@ -691,7 +691,6 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [poorG] });
         }
 
-        // Animasi melempar dadu
         const msg = await message.channel.send({
             embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle('🎲 Mengocok Dadu Gobstones...').setDescription('Dadu ajaib sedang dilempar ke arena...').setTimestamp()]
         });
@@ -757,7 +756,6 @@ client.on(Events.MessageCreate, async (message) => {
             let card2 = Math.floor(Math.random() * 10) + 1;
             let total = card1 + card2;
 
-            // Memutuskan ambil kartu ke-3 atau tidak (50% peluang)
             let extraCardText = '';
             if (Math.random() > 0.5 && total < 22) {
                 const card3 = Math.floor(Math.random() * 8) + 1;
