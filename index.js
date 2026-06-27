@@ -1,5 +1,6 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
+
 const {
     Client,
     GatewayIntentBits,
@@ -7,11 +8,9 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    EmbedBuilder,
-    ComponentType
+    EmbedBuilder
 } = require('discord.js');
 
-// Mengambil model User (Pastikan folder models dan file User.js ada di server)
 const User = require('./models/User'); 
 
 const client = new Client({
@@ -25,13 +24,12 @@ const client = new Client({
 });
 
 // ==========================================
-// KONFIGURASI HOGWARTS & CACHE
+// PENGATURAN HOGWARTS & DATABASE
 // ==========================================
 const OWNER_ID = '1180180812327559310'; 
-// Fallback aman jika process.env gagal terbaca di hosting
-const LEVEL_UP_CHANNEL_ID = process.env.LEVELUP_CHANNEL_ID || '1475801714425860272'; 
-const EMBED_COLOR = '#25a5cf'; 
-const MAX_BET_LIMIT = 500000; 
+const LEVEL_UP_CHANNEL_ID = '1475801714425860272'; 
+const EMBED_COLOR = '#25a5cf'; // Kode warna embed konsisten
+const MAX_BET_LIMIT = 500000; // Batas maksimal gambling
 
 const HOUSES_DATA = [
     { id: '1475605712938864796', name: 'Gryffindor', emoji: '🦁', command: 'gryffindor' },
@@ -40,30 +38,6 @@ const HOUSES_DATA = [
     { id: '1475787032759631965', name: 'Hufflepuff', emoji: '🦡', command: 'hufflepuff' }
 ];
 
-const SHOP_ITEMS = [
-    // Slide 1: Ramuan / Potion
-    { id: 'potion_felix', name: 'Felix Felicis (Ramuan Hoki)', type: 'potion', rarity: 'epic', price: 15000, desc: 'Meningkatkan hoki judi 10% selama 1 jam.' },
-    { id: 'potion_poly', name: 'Polyjuice Potion', type: 'potion', rarity: 'rare', price: 8000, desc: 'Ramuan penyamaran misterius.' },
-    // Slide 2: Titles / Gelar
-    { id: 'title_duelist', name: 'Title: Apprentice Duelist', type: 'title', rarity: 'common', price: 5000, titleText: 'Apprentice Duelist', desc: 'Gelar petarung sihir pemula.' },
-    { id: 'title_animagus', name: 'Title: Animagus', type: 'title', rarity: 'rare', price: 25000, titleText: 'Animagus', desc: 'Gelar penyihir perubahan bentuk.' },
-    { id: 'title_archmage', name: 'Title: Archmage', type: 'title', rarity: 'legendary', price: 200000, titleText: 'Archmage', desc: 'Gelar penyihir tingkat tinggi.' },
-    // Slide 3: Makanan Pet
-    { id: 'food_basic', name: 'Biji Labu Ajaib (Pakan Pet)', type: 'food', rarity: 'common', price: 100, desc: 'Makanan pokok untuk peliharaan.' },
-    { id: 'food_premium', name: 'Daging Sapi Unicorn (Pakan Pet)', type: 'food', rarity: 'rare', price: 1200, desc: 'Makanan lezat penambah kesetiaan.' },
-    // Slide 4: Pet Shop
-    { id: 'pet_rat', name: 'Pet: Rat (Common)', type: 'pet', rarity: 'common', price: 2000, desc: 'Peliharaan tikus kecil yang penurut.' },
-    { id: 'pet_toad', name: 'Pet: Toad (Common)', type: 'pet', rarity: 'common', price: 2500, desc: 'Katak peliharaan yang sering melompat.' },
-    { id: 'pet_kneazle', name: 'Pet: Kneazle (Uncommon)', type: 'pet', rarity: 'uncommon', price: 7500, desc: 'Kucing hutan cerdas kerabat kneazle.' },
-    { id: 'pet_hippogriff', name: 'Pet: Hippogriff (Rare)', type: 'pet', rarity: 'rare', price: 35000, desc: 'Kuda elang peliharaan yang sangat bangga.' },
-    { id: 'pet_dragon', name: 'Pet: Dragon Cub (Epic)', type: 'pet', rarity: 'epic', price: 100000, desc: 'Anak naga api kecil yang mengagumkan.' },
-    { id: 'pet_phoenix', name: 'Pet: Phoenix (Legendary)', type: 'pet', rarity: 'legendary', price: 500000, desc: 'Burung api legendaris yang abadi.' }
-];
-
-let activeShopStock = [];
-const gamblingCooldowns = new Map();
-const xpCooldowns = new Set();
-
 let housePointsCache = {
     'Gryffindor': 0,
     'Slytherin': 0,
@@ -71,47 +45,12 @@ let housePointsCache = {
     'Hufflepuff': 0
 };
 
-// ==========================================
-// KALKULASI LEVEL
-// ==========================================
+// Global Cooldown Map untuk command gambling
+const gamblingCooldowns = new Map();
+
 function getXpNeededForNextLevel(level) {
-    if (level >= 9999) return 999999;
-    if (level < 500) return level * 25;
-    return level * 65;
-}
-
-function getTotalXpRequirement(targetLevel) {
-    let total = 0;
-    for (let l = 1; l < targetLevel; l++) {
-        total += getXpNeededForNextLevel(l);
-    }
-    return total;
-}
-
-async function migrateUserLevel(userDoc) {
-    const currentTotalXp = (userDoc.level ? getTotalXpRequirement(userDoc.level) : 0) + (userDoc.xp || 0);
-    
-    let newLevel = 1;
-    let remainingXp = currentTotalXp;
-    
-    while (true) {
-        const needed = getXpNeededForNextLevel(newLevel);
-        if (remainingXp >= needed) {
-            remainingXp -= needed;
-            newLevel++;
-            if (newLevel >= 1000) {
-                newLevel = 1000;
-                remainingXp = 0;
-                break;
-            }
-        } else {
-            break;
-        }
-    }
-    
-    userDoc.level = newLevel;
-    userDoc.xp = remainingXp;
-    await userDoc.save();
+    if (level >= 9999) return 49995;
+    return level * 5; 
 }
 
 function getWizardTitle(level, userId) {
@@ -139,73 +78,15 @@ function getWizardTitle(level, userId) {
     return 'New Student';
 }
 
-function generateRandomStock() {
-    activeShopStock = [];
-    
-    SHOP_ITEMS.forEach(item => {
-        let maxStock = 0;
-        const roll = Math.random() * 100;
-
-        if (item.rarity === 'common') {
-            if (roll < 70) maxStock = Math.floor(Math.random() * 7) + 1;
-        } else if (item.rarity === 'uncommon') {
-            if (roll < 40) maxStock = Math.floor(Math.random() * 5) + 1;
-        } else if (item.rarity === 'rare') {
-            if (roll < 15) maxStock = Math.floor(Math.random() * 4) + 1;
-        } else if (item.rarity === 'epic') {
-            if (roll < 5) maxStock = Math.floor(Math.random() * 3) + 1;
-        } else if (item.rarity === 'legendary') {
-            if (roll < 1) maxStock = 1;
-        }
-
-        if (maxStock > 0) {
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-            let uniqueCode = '';
-            for (let i = 0; i < 6; i++) {
-                uniqueCode += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-
-            activeShopStock.push({
-                ...item,
-                stockCode: uniqueCode,
-                stock: maxStock
-            });
-        }
-    });
-    console.log(`🛒 Toko Sihir Di-reset. Total Item Global Tersedia: ${activeShopStock.length}`);
-}
+const xpCooldowns = new Set();
 
 // ==========================================
-// KONEKSI DATABASE & INISIALISASI
+// KONEKSI DATABASE & BOT READY
 // ==========================================
-const dbUrl = process.env.MONGO_URL || process.env.MONGODB_URI;
-if (!dbUrl) {
-    console.error("❌ PENTING: MONGODB_URI atau MONGO_URL belum diset di Variable Environment hostinganmu!");
-}
-
-mongoose.connect(dbUrl)
-.then(async () => {
+mongoose.connect(process.env.MONGO_URL || process.env.MONGODB_URI)
+.then(() => {
     console.log('🔗 Connected to MongoDB Database successfully!');
-    
-    try {
-        const allUsers = await User.find({});
-        for (let u of allUsers) {
-            await migrateUserLevel(u);
-        }
-        console.log('✅ Penyesuaian level murid ke sistem baru selesai dimigrasi!');
-    } catch (migErr) {
-        console.error('❌ Gagal menjalankan migrasi level (diabaikan jika database kosong):', migErr.message);
-    }
-
-    generateRandomStock();
-    setInterval(generateRandomStock, 3600000);
-
-    const token = process.env.DISCORD_TOKEN;
-    if (!token) {
-        console.error("❌ PENTING: DISCORD_TOKEN belum diset di Variable Environment hostinganmu!");
-    } else {
-        client.login(token);
-    }
+    client.login(process.env.DISCORD_TOKEN);
 }).catch(err => {
     console.error('❌ Failed to connect to MongoDB:', err);
 });
@@ -213,12 +94,11 @@ mongoose.connect(dbUrl)
 client.once(Events.ClientReady, () => {
     console.log(`✨ Logged in as ${client.user.tag} — System online! ✨`);
 
-    // Voice State Loop
+    // Voice XP Loop Anti Reset
     setInterval(async () => {
         try {
             const guilds = client.guilds.cache;
             for (const [guildId, guild] of guilds) {
-                if (!guild.voiceStates) continue;
                 guild.voiceStates.cache.forEach(async (voiceState) => {
                     const userId = voiceState.id;
 
@@ -230,7 +110,7 @@ client.once(Events.ClientReady, () => {
 
                         if (userDoc.level >= 1000) return;
 
-                        userDoc.xp += 30;
+                        userDoc.xp += 12;
 
                         const userHouseObj = HOUSES_DATA.find(h => voiceState.member.roles.cache.has(h.id));
                         if (userHouseObj) {
@@ -239,12 +119,17 @@ client.once(Events.ClientReady, () => {
 
                         let xpNeeded = getXpNeededForNextLevel(userDoc.level);
                         let levelUpOccurred = false;
+                        let reachedLevelCheckpoint = false;
 
                         while (userDoc.xp >= xpNeeded) {
                             userDoc.xp -= xpNeeded;
                             userDoc.level += 1;
                             xpNeeded = getXpNeededForNextLevel(userDoc.level);
                             levelUpOccurred = true;
+
+                            if (userDoc.level % 5 === 0) {
+                                reachedLevelCheckpoint = true;
+                            }
 
                             if (userDoc.level >= 1000) {
                                 userDoc.level = 1000;
@@ -255,7 +140,7 @@ client.once(Events.ClientReady, () => {
 
                         await userDoc.save();
 
-                        if (levelUpOccurred && userDoc.level % 5 === 0) {
+                        if (levelUpOccurred && reachedLevelCheckpoint) {
                             const newTitle = getWizardTitle(userDoc.level, userId);
                             const levelUpChannel = guild.channels.cache.get(LEVEL_UP_CHANNEL_ID);
                             
@@ -275,11 +160,20 @@ client.once(Events.ClientReady, () => {
         } catch (err) {
             console.error('Masalah saat memproses Voice XP Loop:', err);
         }
-    }, 150000); 
+    }, 60000); 
+});
+
+client.on(Events.GuildMemberRemove, async (guild) => {
+    try {
+        await User.deleteMany({ guildId: guild.id });
+        console.log(`🧹 Semua data level dan ekonomi di-reset otomatis karena bot di-kick dari server ${guild.name}.`);
+    } catch (err) {
+        console.error('Gagal menghapus data guild:', err);
+    }
 });
 
 // ==========================================
-// MESSAGECREATE - SISTEM UTAMA & COMMAND
+// EVENT HANDLER CHAT (Sistem Utama)
 // ==========================================
 client.on(Events.MessageCreate, async (message) => {
     if (message.author.bot || !message.guild) return;
@@ -288,21 +182,28 @@ client.on(Events.MessageCreate, async (message) => {
     const args = message.content.split(' ');
     const command = args[0].toLowerCase();
 
+    const levelUpChannel = message.guild.channels.cache.get(LEVEL_UP_CHANNEL_ID) || message.channel;
     const userHouseObj = HOUSES_DATA.find(h => message.member.roles.cache.has(h.id));
-    const isOwner = userId === OWNER_ID;
 
+    const isOwner = userId === OWNER_ID;
+    const isSorted = !!userHouseObj;
+
+    // Fungsi Cooldown Check (10 Detik, Countdown ganti angka, Auto-Delete)
     const checkAndSetCooldown = async (cmdName) => {
-        if (isOwner) return false;
+        if (isOwner) return false; // Owner bebas cooldown
         const now = Date.now();
-        const cooldownAmount = 10000; 
+        const cooldownAmount = 10000; // 10 detik dalam milidetik
         const timestamps = gamblingCooldowns.get(cmdName);
 
         if (timestamps && timestamps.has(userId)) {
             const expirationTime = timestamps.get(userId) + cooldownAmount;
             if (now < expirationTime) {
                 let secondsLeft = Math.ceil((expirationTime - now) / 1000);
+                
+                // Kirim pesan awal countdown
                 const cdMsg = await message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${secondsLeft} detik** lagi.`);
 
+                // Interval untuk mengubah angka setiap 1 detik
                 const interval = setInterval(() => {
                     secondsLeft -= 1;
                     if (secondsLeft > 0) {
@@ -310,12 +211,13 @@ client.on(Events.MessageCreate, async (message) => {
                     }
                 }, 1000);
 
+                // Hapus pesan setelah 10 detik
                 setTimeout(() => {
                     clearInterval(interval);
                     cdMsg.delete().catch(() => {});
                 }, cooldownAmount);
 
-                return true; 
+                return true; // Menandakan cooldown aktif
             }
         }
         
@@ -327,753 +229,1117 @@ client.on(Events.MessageCreate, async (message) => {
         return false;
     };
 
+    // A. HELP DIRECTORY COMMAND
     if (command === '!help') {
         const helpEmbed = new EmbedBuilder()
             .setColor(EMBED_COLOR)
             .setTitle('📜 Hogwarts Academy - Command Directory')
-            .setDescription('Berikut adalah daftar mantra (*command*) yang dapat kamu gunakan di akademi sihir ini:')
+            .setDescription('Berikut adalah daftar mantra (*command*) yang dapat kamu gunakan di akademi sihir ini, dikelompokkan berdasarkan fungsinya:')
             .addFields(
-                { name: '🏰 Akademik', value: '`!profile`\n`!student`\n`!leaderboard`' },
-                { name: '🪙 Keuangan', value: '`!absen`\n`!cash`\n`!send`' },
-                { name: '🛒 Toko & Inventaris', value: '`!shop`\n`!title`\n`!equiptitle <kode>`\n`!pet`\n`!petequip <kode>`\n`!feedpet`' },
-                { name: '🎲 Kasino Sihir', value: '`!toss`\n`!slot`\n`!gobs`\n`!snap`\n`!snitch`' }
+                { 
+                    name: '🏰 Sistem Akademik & Informasi', 
+                    value: 
+                        '`!profile`\n' +
+                        '`!student`\n' +
+                        '`!leaderboard`'
+                },
+                { 
+                    name: '🪙 Sistem Keuangan & Dompet (Currency)', 
+                    value: 
+                        '`!absen`\n' +
+                        '`!cash`\n' +
+                        '`!send <@User> <jumlah>`'
+                },
+                { 
+                    name: '🎲 Kasino Sihir & Perjudian (Gambling) — *Max Bet: 500.000 G | Cooldown: 10s*', 
+                    value: 
+                        '`!toss <jumlah>`\n' +
+                        '`!slot <jumlah>`\n' +
+                        '`!gobs <jumlah>`\n' +
+                        '`!snap <jumlah>`\n' +
+                        '`!snitch <jumlah>`'
+                },
+                { 
+                    name: '👑 Admin / Lord Command', 
+                    value: 
+                        '`!sortinghat`\n' +
+                        '`!setlevel <@User> <level>`\n' +
+                        '`!givepoint <@User> <poin>`'
+                }
             )
-            .setTimestamp();
+            .setTimestamp()
+            .setFooter({ text: 'Hogwarts Academy Magic System', iconURL: client.user.displayAvatarURL() });
+
         return message.channel.send({ embeds: [helpEmbed] });
     }
 
-    if (command === '!absen') {
-        if (userId === OWNER_ID) return message.reply('Owner tidak bisa absen.');
-        let userDoc = await User.findOne({ userId, guildId: message.guild.id });
-        if (!userDoc) userDoc = new User({ userId, guildId: message.guild.id, xp: 0, level: 1, galleons: 0 });
+    // B. ADMIN COMMANDS (Khusus Lord / Owner Server)
+    if (command === '!setlevel') {
+        if (!isOwner) return message.reply('❌ Hanya Lord yang berhak memanipulasi tingkat sihir!');
+        const targetUser = message.mentions.users.first();
+        const newLevel = parseInt(args[2]);
 
-        const now = new Date();
-        if (userDoc.lastAbsen && now.toDateString() === userDoc.lastAbsen.toDateString()) {
-            return message.reply('⏳ Anda sudah melakukan absen hari ini. Silakan coba lagi besok!');
+        if (!targetUser || isNaN(newLevel)) return message.reply('🔮 **Format Salah!** Gunakan: `!setlevel @User <angka_level>`');
+        if (targetUser.id === OWNER_ID) return message.reply('👑 Level Lord sudah dikunci permanen di puncak tertinggi!');
+
+        let userDoc = await User.findOne({ userId: targetUser.id, guildId: message.guild.id });
+        if (!userDoc) {
+            userDoc = new User({ userId: targetUser.id, guildId: message.guild.id, xp: 0, level: 1, galleons: 0 });
         }
 
-        const bonusGalleons = 500;
-        userDoc.galleons += bonusGalleons;
-        userDoc.lastAbsen = now;
+        userDoc.level = Math.min(newLevel, 1000); 
+        userDoc.xp = 0; 
         await userDoc.save();
 
-        const embed = new EmbedBuilder()
+        message.reply(`✅ Berhasil mengubah tingkat sihir ${targetUser} menjadi **Level ${userDoc.level}**!`);
+        return;
+    }
+
+    if (command === '!givepoint') {
+        if (!isOwner) return message.reply('❌ Hanya Lord yang bisa memberikan berkah poin asrama!');
+        const targetMember = message.mentions.members.first();
+        const points = parseInt(args[2]);
+
+        if (!targetMember || isNaN(points)) return message.reply('🔮 **Format Salah!** Gunakan: `!givepoint @User <jumlah_poin>`');
+
+        const targetHouse = HOUSES_DATA.find(h => targetMember.roles.cache.has(h.id));
+        if (!targetHouse) return message.reply('❌ Penyihir tersebut belum bergabung dengan asrama Hogwarts mana pun!');
+
+        housePointsCacheUpdate(targetHouse.name, points);
+
+        return message.reply(`🏆 **+${points.toLocaleString()} Poin** telah dianugerahkan ke asrama **${targetHouse.emoji} ${targetHouse.name}** berkat prestasi ${targetMember}!`);
+    }
+
+    if (command === '!levelup') {
+        if (!isOwner) return message.reply('❌ Perintah ini khusus untuk Lord of Magic!');
+        const testEmbed = new EmbedBuilder()
             .setColor(EMBED_COLOR)
-            .setTitle('✨ Absen Harian Diterima')
-            .setDescription(`Selamat, kamu mendapatkan **+${bonusGalleons.toLocaleString()} Galleons** sebagai uang saku harian akademis!`);
-        return message.channel.send({ embeds: [embed] });
+            .setTitle('✨ Hogwarts Academy Level Up!')
+            .setDescription(`Selamat! ${message.author} telah naik level! 🎓`)
+            .setTimestamp();
+
+        await levelUpChannel.send({ embeds: [testEmbed] });
+        return; 
+    }
+
+    if (command === '!sortinghat') {
+        if (!isOwner) return message.reply('❌ Hanya Lord of Magic yang berhak memanggil The Sorting Hat!');
+
+        const embed = new EmbedBuilder()
+            .setColor(EMBED_COLOR) 
+            .setTitle('The Sorting Hat')
+            .setDescription('Welcome to **Hogwarts Academy**\n\nSilahkan tekan tombol di bawah dan biarkan Sorting Hat menentukan kelasmu!');
+
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('sorting_hat').setLabel('Mencari Kelas').setEmoji('🎩').setStyle(ButtonStyle.Secondary)
+        );
+
+        await message.channel.send({ embeds: [embed], components: [row] });
+        return;
+    }
+
+    // Blokir command umum jika belum mendapat role kelas asrama
+    if (!isSorted && !isOwner) {
+        if (['!profile', '!leaderboard', '!student', '!absen', '!cash', '!send', '!toss', '!slot', '!gobs', '!snap', '!snitch'].some(cmd => command.startsWith(cmd))) {
+            const blockedEmbed = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('❌ Akses Ditolak!')
+                .setDescription('Perintah ini hanya boleh digunakan oleh murid yang sudah memiliki Role Asrama / Kelas (Lewat The Sorting Hat). Silakan hubungi Lord of Magic!')
+                .setTimestamp();
+            return message.channel.send({ embeds: [blockedEmbed] });
+        }
+    }
+
+    // C. CURRENCY SYSTEM (Absen, Cash, Send)
+    if (command === '!absen') {
+        try {
+            let userDoc = await User.findOne({ userId, guildId: message.guild.id });
+            if (!userDoc) {
+                userDoc = new User({ userId, guildId: message.guild.id, xp: 0, level: 1, galleons: 0 });
+            }
+
+            const cooldownTime = 24 * 60 * 60 * 1000; 
+            if (userDoc.lastAbsen && (Date.now() - userDoc.lastAbsen.getTime()) < cooldownTime) {
+                const remainingTime = cooldownTime - (Date.now() - userDoc.lastAbsen.getTime());
+                const hours = Math.floor(remainingTime / (60 * 60 * 1000));
+                const minutes = Math.floor((remainingTime % (60 * 60 * 1000)) / (60 * 1000));
+                
+                const waitEmbed = new EmbedBuilder()
+                    .setColor(EMBED_COLOR)
+                    .setTitle('⏳ Batas Waktu Absen')
+                    .setDescription(`Tunggu **${hours} jam ${minutes} menit** lagi sebelum bisa mengambil tunjangan harianmu kembali!`)
+                    .setTimestamp();
+                return message.channel.send({ embeds: [waitEmbed] });
+            }
+
+            function getAbsenXp() {
+                const rand = Math.random();
+                if (rand < 0.75) {
+                    return Math.floor(Math.random() * 20) + 1;
+                } else {
+                    return Math.floor(Math.random() * 30) + 21;
+                }
+            }
+
+            function getAbsenGalleons() {
+                const rand = Math.random();
+                if (rand < 0.75) {
+                    return Math.floor(Math.random() * 801) + 400;
+                } else {
+                    return Math.floor(Math.random() * 800) + 1201;
+                }
+            }
+
+            const xpGained = getAbsenXp();
+            const galleonsGained = getAbsenGalleons();
+
+            userDoc.xp += xpGained;
+            userDoc.galleons = (userDoc.galleons || 0) + galleonsGained;
+            userDoc.lastAbsen = new Date();
+
+            let xpNeeded = getXpNeededForNextLevel(userDoc.level);
+            let levelUpOccurred = false;
+
+            while (userDoc.xp >= xpNeeded) {
+                userDoc.xp -= xpNeeded;
+                userDoc.level += 1;
+                xpNeeded = getXpNeededForNextLevel(userDoc.level);
+                levelUpOccurred = true;
+                if (userDoc.level >= 1000) {
+                    userDoc.level = 1000;
+                    userDoc.xp = 0;
+                    break;
+                }
+            }
+
+            await userDoc.save();
+
+            let descText = `Absen harian berhasil! Kamu mendapatkan tunjangan sihir:\n\n⭐ **+${xpGained} XP**\n🪙 **+${galleonsGained.toLocaleString()} Galleons**`;
+            if (levelUpOccurred) {
+                descText += `\n\n🎉 Selamat, tingkat sihirmu naik ke **Level ${userDoc.level}**!`;
+            }
+
+            const absenEmbed = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('📜 Absen Harian Akademik')
+                .setDescription(descText)
+                .setTimestamp();
+            return message.channel.send({ embeds: [absenEmbed] });
+
+        } catch (err) {
+            console.error('Error saat memproses !absen:', err);
+        }
     }
 
     if (command === '!cash') {
-        let userDoc = await User.findOne({ userId, guildId: message.guild.id });
-        const galleons = userDoc ? userDoc.galleons || 0 : 0;
-        const embed = new EmbedBuilder()
-            .setColor(EMBED_COLOR)
-            .setTitle('🪙 Pundi-pundi Galleon')
-            .setDescription(`Saldo dompet sihirmu saat ini adalah **${galleons.toLocaleString()} Galleons**.`);
-        return message.channel.send({ embeds: [embed] });
-    }
-
-    if (command === '!send') {
-        const targetUser = message.mentions.users.first();
-        const amount = parseInt(args[2]);
-
-        if (!targetUser || isNaN(amount) || amount <= 0) {
-            return message.reply('🔮 Format salah. Gunakan: `!send @User <jumlah>`');
-        }
-
-        if (targetUser.bot || targetUser.id === userId) {
-            return message.reply('❌ Tidak dapat mengirim Galleon ke diri sendiri atau bot.');
-        }
-
-        let senderDoc = await User.findOne({ userId, guildId: message.guild.id });
-        if (!senderDoc || (senderDoc.galleons || 0) < amount) {
-            return message.reply('🪙 Galleons di ranselmu tidak mencukupi untuk melakukan transfer ini.');
-        }
-
-        let receiverDoc = await User.findOne({ userId: targetUser.id, guildId: message.guild.id });
-        if (!receiverDoc) {
-            receiverDoc = new User({ userId: targetUser.id, guildId: message.guild.id, xp: 0, level: 1, galleons: 0 });
-        }
-
-        senderDoc.galleons -= amount;
-        receiverDoc.galleons += amount;
-
-        await senderDoc.save();
-        await receiverDoc.save();
-
-        return message.reply(`✅ Berhasil mengirim **${amount.toLocaleString()} Galleons** kepada <@${targetUser.id}>.`);
-    }
-
-    if (command === '!shop') {
         let userDoc = await User.findOne({ userId, guildId: message.guild.id });
         if (!userDoc) {
             userDoc = new User({ userId, guildId: message.guild.id, xp: 0, level: 1, galleons: 0 });
             await userDoc.save();
         }
 
-        let currentSlide = 1;
-        const maxSlides = 4;
-
-        const generateShopEmbed = (slide) => {
-            const embed = new EmbedBuilder()
-                .setColor(EMBED_COLOR)
-                .setTimestamp()
-                .setFooter({ text: `Hogwarts Magic Shop (Refresh dalam 1 Jam) | Saldo: ${userDoc.galleons.toLocaleString()} G` });
-
-            if (slide === 1) {
-                embed.setTitle('🛒 Potion / Ramuan Sihir (Slide 1/4)');
-                embed.setDescription('Ramuan-ramuan sihir untuk meningkatkan kemampuanmu.');
-                const potions = activeShopStock.filter(i => i.type === 'potion');
-                if (potions.length === 0) embed.addFields({ name: 'Stok Kosong', value: 'Belum ada ramuan yang tersedia saat ini.' });
-                potions.forEach(p => {
-                    embed.addFields({ name: `[${p.rarity.toUpperCase()}] ${p.name} — *Stok: ${p.stock}*`, value: `${p.desc}\n💰 Harga: **${p.price.toLocaleString()} G** | Kode: \`${p.stockCode}\`` });
-                });
-            } else if (slide === 2) {
-                embed.setTitle('📜 Title / Gelar Sihir (Slide 2/4)');
-                embed.setDescription('Gunakan gelar (*title*) untuk memperindah profilmu.');
-                const titles = activeShopStock.filter(i => i.type === 'title');
-                if (titles.length === 0) embed.addFields({ name: 'Stok Kosong', value: 'Tidak ada gelar sihir yang dijual saat ini.' });
-                titles.forEach(t => {
-                    embed.addFields({ name: `[${t.rarity.toUpperCase()}] ${t.name} — *Stok: ${t.stock}*`, value: `${t.desc}\n💰 Harga: **${t.price.toLocaleString()} G** | Kode: \`${t.stockCode}\`` });
-                });
-            } else if (slide === 3) {
-                embed.setTitle('🍗 Makanan Peliharaan / Pet Food (Slide 3/4)');
-                embed.setDescription('Berikan nutrisi untuk hewan peliharaanmu agar semakin setia.');
-                const foods = activeShopStock.filter(i => i.type === 'food');
-                if (foods.length === 0) embed.addFields({ name: 'Stok Kosong', value: 'Tidak ada makanan saat ini.' });
-                foods.forEach(f => {
-                    embed.addFields({ name: `[${f.rarity.toUpperCase()}] ${f.name} — *Stok: ${f.stock}*`, value: `${f.desc}\n💰 Harga: **${f.price.toLocaleString()} G** | Kode: \`${f.stockCode}\`` });
-                });
-            } else if (slide === 4) {
-                embed.setTitle('🐾 Peliharaan / Pet Shop (Slide 4/4)');
-                embed.setDescription('Adopsi hewan pendamping sihirmu di sini.');
-                const pets = activeShopStock.filter(i => i.type === 'pet');
-                if (pets.length === 0) embed.addFields({ name: 'Stok Kosong', value: 'Peti hewan peliharaan sedang kosong.' });
-                pets.forEach(pet => {
-                    embed.addFields({ name: `[${pet.rarity.toUpperCase()}] ${pet.name} — *Stok: ${pet.stock}*`, value: `${pet.desc}\n💰 Harga: **${pet.price.toLocaleString()} G** | Kode: \`${pet.stockCode}\`` });
-                });
-            }
-            return embed;
-        };
-
-        const getNavRows = (slide) => {
-            const rowUpper = new ActionRowBuilder();
-            if (slide === 1) {
-                rowUpper.addComponents(new ButtonBuilder().setCustomId('next_slide').setLabel('Next (Slide 2) ➡️').setStyle(ButtonStyle.Primary));
-            } else if (slide === 2) {
-                rowUpper.addComponents(
-                    new ButtonBuilder().setCustomId('prev_slide').setLabel('⬅️ Prev (Slide 1)').setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder().setCustomId('next_slide').setLabel('Next (Slide 3) ➡️').setStyle(ButtonStyle.Primary)
-                );
-            } else if (slide === 3) {
-                rowUpper.addComponents(
-                    new ButtonBuilder().setCustomId('prev_slide').setLabel('⬅️ Prev (Slide 2)').setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder().setCustomId('next_slide').setLabel('Next (Slide 4) ➡️').setStyle(ButtonStyle.Primary)
-                );
-            } else if (slide === 4) {
-                rowUpper.addComponents(new ButtonBuilder().setCustomId('prev_slide').setLabel('⬅️ Prev (Slide 3)').setStyle(ButtonStyle.Primary));
-            }
-
-            const rowLower = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('buy_panel').setLabel('Beli Item').setStyle(ButtonStyle.Success)
-            );
-
-            return [rowUpper, rowLower];
-        };
-
-        const shopMsg = await message.channel.send({ embeds: [generateShopEmbed(currentSlide)], components: getNavRows(currentSlide) });
-
-        const collector = shopMsg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60000 });
-
-        collector.on('collect', async i => {
-            if (i.user.id !== userId) return i.reply({ content: '❌ Anda tidak memiliki akses ke panel ini.', ephemeral: true });
-
-            if (i.customId === 'next_slide' && currentSlide < maxSlides) {
-                currentSlide++;
-                await i.update({ embeds: [generateShopEmbed(currentSlide)], components: getNavRows(currentSlide) });
-            } else if (i.customId === 'prev_slide' && currentSlide > 1) {
-                currentSlide--;
-                await i.update({ embeds: [generateShopEmbed(currentSlide)], components: getNavRows(currentSlide) });
-            } else if (i.customId === 'buy_panel') {
-                const panel2Embed = new EmbedBuilder()
-                    .setColor(EMBED_COLOR)
-                    .setTitle('🛒 Panel Pembelian - Masukkan Kode Item')
-                    .setDescription('Silakan balas lewat chat dalam **15 detik** dengan format: `!shopcode <kode_item>` untuk melanjutkan transaksi.')
-                    .setTimestamp();
-
-                const backRow = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId('back_to_shop').setLabel('⬅️ Kembali ke Toko').setStyle(ButtonStyle.Primary)
-                );
-
-                await i.update({ embeds: [panel2Embed], components: [backRow] });
-            } else if (i.customId === 'back_to_shop') {
-                await i.update({ embeds: [generateShopEmbed(currentSlide)], components: getNavRows(currentSlide) });
-            }
-        });
-
-        collector.on('end', () => {
-            shopMsg.edit({ components: [] }).catch(() => {});
-        });
-        return;
-    }
-
-    if (command.startsWith('!shopcode')) {
-        const inputCode = args[1];
-        if (!inputCode) return message.reply('🔮 Masukkan format kode: `!shopcode <kode_item>`');
-
-        const itemObj = activeShopStock.find(it => it.stockCode === inputCode.toUpperCase());
-        if (!itemObj) return message.reply('❌ Kode item tidak ditemukan atau sudah kedaluwarsa/habis terjual.');
-
-        let userDoc = await User.findOne({ userId, guildId: message.guild.id });
-        if (!userDoc) userDoc = new User({ userId, guildId: message.guild.id, xp: 0, level: 1, galleons: 0 });
-
-        const buyEmbedPanel = new EmbedBuilder()
+        const cashEmbed = new EmbedBuilder()
             .setColor(EMBED_COLOR)
-            .setTitle(`⚖️ Kuantitas Pembelian — ${itemObj.name}`)
-            .setDescription(`Harga Satuan: **${itemObj.price.toLocaleString()} G**\nStok Tersisa: **${itemObj.stock}**\n\nPilih jumlah yang ingin dibeli:`)
+            .setTitle(`💰 Dompet Sihir — ${message.author.username.toUpperCase()}`)
+            .setDescription(`Saldo tabunganmu saat ini adalah:\n\n🪙 **${(userDoc.galleons || 0).toLocaleString()} Galleons**\n\n🏰 Pundi-pundi Asrama: **${(userDoc.houseVault || 0).toLocaleString()} G**`)
             .setTimestamp();
-
-        const countRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`buy_qty_1_${itemObj.stockCode}`).setLabel('1').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`buy_qty_5_${itemObj.stockCode}`).setLabel('5').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`buy_qty_10_${itemObj.stockCode}`).setLabel('10').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`buy_qty_all_${itemObj.stockCode}`).setLabel('ALL').setStyle(ButtonStyle.Secondary)
-        );
-
-        const backRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('back_to_shop_panel').setLabel('⬅️ Back').setStyle(ButtonStyle.Primary)
-        );
-
-        const verifyMsg = await message.channel.send({ embeds: [buyEmbedPanel], components: [countRow, backRow] });
-
-        const collector = verifyMsg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 30000 });
-
-        collector.on('collect', async i => {
-            if (i.user.id !== userId) return i.reply({ content: '❌ Akses ditolak.', ephemeral: true });
-
-            if (i.customId.startsWith('buy_qty_') || i.customId === 'back_to_shop_panel') {
-                if (i.customId === 'back_to_shop_panel') {
-                    return i.update({ content: 'Kembali, silahkan ketik `!shop` untuk membuka toko.', embeds: [], components: [] });
-                }
-
-                const parts = i.customId.split('_');
-                const qtyStr = parts[2]; 
-                const code = parts[3];
-
-                const refItem = activeShopStock.find(it => it.stockCode === code);
-                let qty = 0;
-
-                if (qtyStr === '1') qty = 1;
-                else if (qtyStr === '5') qty = 5;
-                else if (qtyStr === '10') qty = 10;
-                else if (qtyStr === 'all') qty = refItem.stock;
-
-                if (qty > refItem.stock) qty = refItem.stock;
-
-                const totalPrice = refItem.price * qty;
-
-                if (userDoc.galleons < totalPrice) {
-                    return i.reply({ content: `🪙 **Galleons tidak cukup!** Total harga untuk ${qty} item adalah ${totalPrice.toLocaleString()} G.`, ephemeral: true });
-                }
-
-                const finalEmbed = new EmbedBuilder()
-                    .setColor(EMBED_COLOR)
-                    .setTitle('💳 Konfirmasi Pembayaran')
-                    .setDescription(`Item: **${refItem.name}**\nJumlah: **${qty}**\nTotal Bayar: **${totalPrice.toLocaleString()} G**\n\nLanjutkan Pembelian?`)
-                    .setTimestamp();
-
-                const confirmActionRow = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId(`confirm_buy_${code}_${qty}`).setLabel('Buy').setStyle(ButtonStyle.Success),
-                    new ButtonBuilder().setCustomId('cancel_buy').setLabel('Cancel').setStyle(ButtonStyle.Danger)
-                );
-
-                await i.update({ embeds: [finalEmbed], components: [confirmActionRow] });
-            } else if (i.customId === 'cancel_buy') {
-                await verifyMsg.delete().catch(() => {});
-                const cancelEmbed = new EmbedBuilder().setColor(EMBED_COLOR).setTitle('❌ Transaksi Dibatalkan').setDescription('Pesan verifikasi & transaksi dibatalkan.');
-                return message.channel.send({ embeds: [cancelEmbed] });
-            } else if (i.customId.startsWith('confirm_buy_')) {
-                const parts = i.customId.split('_');
-                const code = parts[2];
-                const qty = parseInt(parts[3]);
-
-                const refItem = activeShopStock.find(it => it.stockCode === code);
-                const totalPrice = refItem.price * qty;
-
-                userDoc.galleons -= totalPrice;
-                refItem.stock -= qty;
-                
-                if (refItem.type === 'potion') {
-                    userDoc.potions = userDoc.potions || [];
-                    userDoc.potions.push({ id: refItem.id, name: refItem.name });
-                } else if (refItem.type === 'title') {
-                    userDoc.titles = userDoc.titles || [];
-                    userDoc.titles.push({ id: refItem.id, name: refItem.titleText, code: refItem.stockCode });
-                } else if (refItem.type === 'food') {
-                    userDoc.foods = userDoc.foods || [];
-                    userDoc.foods.push({ id: refItem.id, name: refItem.name, count: qty });
-                } else if (refItem.type === 'pet') {
-                    userDoc.pets = userDoc.pets || [];
-                    userDoc.pets.push({ id: refItem.id, name: refItem.name, code: refItem.stockCode, rarity: refItem.rarity, fed: 0 });
-                }
-
-                await userDoc.save();
-                if (refItem.stock <= 0) {
-                    activeShopStock = activeShopStock.filter(it => it.stockCode !== code);
-                }
-
-                await verifyMsg.delete().catch(() => {});
-                const successEmbed = new EmbedBuilder().setColor(EMBED_COLOR).setTitle('✅ Transaksi Berhasil').setDescription(`Berhasil membeli ${qty} ${refItem.name}.`);
-                return message.channel.send({ embeds: [successEmbed] });
-            }
-        });
-        collector.on('end', () => { verifyMsg.delete().catch(() => {}); });
-        return;
+        return message.channel.send({ embeds: [cashEmbed] });
     }
 
-    if (command === '!title') {
-        let userDoc = await User.findOne({ userId, guildId: message.guild.id });
-        if (!userDoc || !userDoc.titles || userDoc.titles.length === 0) {
-            return message.reply('❌ Kamu belum memiliki title/gelar apa pun. Beli di `!shop` terlebih dahulu!');
-        }
-        
-        let desc = 'Berikut adalah title/gelar yang kamu miliki:\n\n';
-        userDoc.titles.forEach((t, idx) => {
-            desc += `${idx + 1}. **${t.name}** — Kode: \`${t.code}\`\n`;
-        });
-        desc += '\n*Gunakan: `!equiptitle <kode>` untuk memakai gelar.*';
+    if (command === '!send') {
+        const targetUser = message.mentions.users.first();
+        const sendAmount = parseInt(args[2]);
 
-        const embed = new EmbedBuilder().setColor(EMBED_COLOR).setTitle('📜 Daftar Gelar Sihir Anda').setDescription(desc);
-        return message.channel.send({ embeds: [embed] });
-    }
-
-    if (command === '!equiptitle') {
-        const code = args[1];
-        if (!code) return message.reply('🔮 Gunakan: `!equiptitle <kode_title>`');
-
-        let userDoc = await User.findOne({ userId, guildId: message.guild.id });
-        if (!userDoc || !userDoc.titles) return message.reply('❌ Kamu tidak memiliki gelar tersebut.');
-
-        const targetTitle = userDoc.titles.find(t => t.code === code.toUpperCase());
-        if (!targetTitle) return message.reply('❌ Kode gelar sihir tidak valid atau tidak ada di inventaris title Anda.');
-
-        userDoc.equippedTitle = targetTitle.name;
-        await userDoc.save();
-
-        return message.reply(`✅ Berhasil memasang gelar **${targetTitle.name}** pada jubah sihirmu!`);
-    }
-
-    if (command === '!pet') {
-        let userDoc = await User.findOne({ userId, guildId: message.guild.id });
-        if (!userDoc || !userDoc.pets || userDoc.pets.length === 0) {
-            return message.reply('🐾 Kamu belum memiliki hewan peliharaan (*pet*). Silakan adopsi lewat `!shop`!');
+        if (!targetUser || isNaN(sendAmount) || sendAmount <= 0) {
+            const formatSendEmbed = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🔮 Format Pengiriman Galleon Salah')
+                .setDescription('Gunakan format:\n`!send @User <jumlah_galleon>`\n*(Contoh: `!send @Harry 50`)*')
+                .setTimestamp();
+            return message.channel.send({ embeds: [formatSendEmbed] });
         }
 
-        let desc = 'Berikut daftar peliharaan yang kamu adopsi:\n\n';
-        userDoc.pets.forEach((p, idx) => {
-            const equippedStatus = userDoc.equippedPetCode === p.code ? '🟢 (Sedang Dipakai)' : '';
-            desc += `${idx + 1}. ${p.name} (Rarity: **${p.rarity.toUpperCase()}**) — Kode: \`${p.code}\` ${equippedStatus}\n`;
-        });
-        desc += '\n*Gunakan `!petequip <kode>` untuk membawa peliharaanmu.*';
-
-        const embed = new EmbedBuilder().setColor(EMBED_COLOR).setTitle('Канданг Peliharaan Anda').setDescription(desc);
-        return message.channel.send({ embeds: [embed] });
-    }
-
-    if (command === '!petequip') {
-        const code = args[1];
-        if (!code) return message.reply('🔮 Gunakan format: `!petequip <kode_pet>`');
-
-        let userDoc = await User.findOne({ userId, guildId: message.guild.id });
-        if (!userDoc || !userDoc.pets) return message.reply('❌ Kamu belum memiliki hewan peliharaan.');
-
-        const targetPet = userDoc.pets.find(p => p.code === code.toUpperCase());
-        if (!targetPet) return message.reply('❌ Kode pet tidak valid / tidak ada dalam ransel peliharaanmu.');
-
-        userDoc.equippedPetCode = targetPet.code;
-        userDoc.equippedPetName = targetPet.name;
-        await userDoc.save();
-
-        return message.reply(`🪄 Berhasil memanggil dan memakai peliharaan: **${targetPet.name}**!`);
-    }
-
-    if (command === '!feedpet') {
-        let userDoc = await User.findOne({ userId, guildId: message.guild.id });
-        if (!userDoc || !userDoc.pets || userDoc.pets.length === 0) {
-            return message.reply('❌ Kamu belum memiliki hewan peliharaan untuk diberi makan.');
+        if (targetUser.bot) {
+            const botSendEmbed = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('❌ Transaksi Ditolak')
+                .setDescription('Kamu tidak bisa mengirim Galleon kepada bot sihir!')
+                .setTimestamp();
+            return message.channel.send({ embeds: [botSendEmbed] });
         }
 
-        if (!userDoc.foods || userDoc.foods.length === 0) {
-            return message.reply('🍗 Ransel makananmu kosong! Silakan beli makanan pet di `!shop` terlebih dahulu.');
+        if (targetUser.id === userId) {
+            const selfSendEmbed = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('❌ Transaksi Ditolak')
+                .setDescription('Kamu tidak bisa mengirim Galleon kepada diri sendiri!')
+                .setTimestamp();
+            return message.channel.send({ embeds: [selfSendEmbed] });
         }
 
-        const embedPet = new EmbedBuilder().setColor(EMBED_COLOR).setTitle('🐾 Pilih Peliharaan').setDescription('Pilih hewan peliharaan mana yang ingin kamu beri makan:');
-        const rowPet = new ActionRowBuilder();
-        userDoc.pets.forEach((p, idx) => {
-            rowPet.addComponents(new ButtonBuilder().setCustomId(`feed_pet_${idx}`).setLabel(p.name).setStyle(ButtonStyle.Primary));
-        });
-
-        const msg = await message.channel.send({ embeds: [embedPet], components: [rowPet] });
-
-        const filter = i => i.user.id === userId;
-        const collector = msg.createMessageComponentCollector({ filter, time: 60000 });
-
-        let selectedPetIndex = null;
-
-        collector.on('collect', async i => {
-            if (i.customId.startsWith('feed_pet_')) {
-                selectedPetIndex = parseInt(i.customId.split('_')[2]);
-                
-                const embedFood = new EmbedBuilder().setColor(EMBED_COLOR).setTitle('🍗 Pilih Jenis Makanan').setDescription('Pilih pakan untuk peliharaanmu:');
-                const rowFood = new ActionRowBuilder();
-                userDoc.foods.forEach((f, idx) => {
-                    rowFood.addComponents(new ButtonBuilder().setCustomId(`feed_food_${idx}`).setLabel(f.name).setStyle(ButtonStyle.Success));
-                });
-                rowFood.addComponents(new ButtonBuilder().setCustomId('close_feed').setLabel('Close').setStyle(ButtonStyle.Danger));
-
-                await i.update({ embeds: [embedFood], components: [rowFood] });
-            } else if (i.customId.startsWith('feed_food_')) {
-                const foodIndex = parseInt(i.customId.split('_')[2]);
-                const foodItem = userDoc.foods[foodIndex];
-
-                const embedQty = new EmbedBuilder().setColor(EMBED_COLOR).setTitle('✨ Tentukan Kuantitas Makan').setDescription(`Beri makan **${foodItem.name}** sebanyak apa?`);
-                const rowQty = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId(`feed_act_1_${selectedPetIndex}_${foodIndex}`).setLabel('Feed 1x').setStyle(ButtonStyle.Secondary),
-                    new ButtonBuilder().setCustomId(`feed_act_5_${selectedPetIndex}_${foodIndex}`).setLabel('x5').setStyle(ButtonStyle.Secondary),
-                    new ButtonBuilder().setCustomId(`feed_act_10_${selectedPetIndex}_${foodIndex}`).setLabel('x10').setStyle(ButtonStyle.Secondary),
-                    new ButtonBuilder().setCustomId('close_feed').setLabel('Close').setStyle(ButtonStyle.Danger)
-                );
-
-                await i.update({ embeds: [embedQty], components: [rowQty] });
-            } else if (i.customId.startsWith('feed_act_')) {
-                const parts = i.customId.split('_');
-                const qty = parseInt(parts[2]);
-                const pIdx = parseInt(parts[3]);
-                const fIdx = parseInt(parts[4]);
-
-                const fItem = userDoc.foods[fIdx];
-                if (fItem.count < qty) {
-                    return i.reply({ content: `❌ Stok makanan **${fItem.name}** tidak cukup untuk jumlah tersebut!`, ephemeral: true });
-                }
-
-                fItem.count -= qty;
-                if (fItem.count <= 0) {
-                    userDoc.foods = userDoc.foods.filter((_, idx) => idx !== fIdx);
-                }
-
-                userDoc.pets[pIdx].fed = (userDoc.pets[pIdx].fed || 0) + qty;
-                await userDoc.save();
-
-                await msg.delete().catch(() => {});
-                return message.channel.send({ embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle('✅ Sukses Memberi Makan').setDescription(`Peliharaan **${userDoc.pets[pIdx].name}** telah diberi makan sebanyak **${qty} kali**.`)] });
-            } else if (i.customId === 'close_feed') {
-                await msg.delete().catch(() => {});
-            }
-        });
-        return;
-    }
-
-    if (command === '!toss') {
-        const betAmount = parseInt(args[1]);
-        if (isNaN(betAmount) || betAmount <= 0) return message.channel.send({ embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle('🔮 Format Coffin Toss Salah').setDescription('Gunakan: `!toss <jumlah>`')] });
-        const isCooldown = await checkAndSetCooldown('toss');
-        if (isCooldown) return;
-        if (betAmount > MAX_BET_LIMIT) return message.channel.send({ embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle('⚠️ Batas Taruhan').setDescription(`Max: **${MAX_BET_LIMIT.toLocaleString()}**`)] });
-
-        let userDoc = await User.findOne({ userId, guildId: message.guild.id });
-        if (!userDoc || (userDoc.galleons || 0) < betAmount) return message.channel.send({ embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle('🪙 Saldo Kurang').setDescription('Galleons tidak cukup.')] });
+        let senderDoc = await User.findOne({ userId, guildId: message.guild.id });
+        if (!senderDoc || (senderDoc.galleons || 0) < sendAmount) {
+            const poorEmbed = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🪙 Saldo Tidak Cukup')
+                .setDescription(`Tabungan Galleon kamu tidak mencukupi untuk melakukan transaksi sebesar **${sendAmount.toLocaleString()} G**.\nSaldo saat ini: **${(senderDoc ? senderDoc.galleons : 0).toLocaleString()} G**`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [poorEmbed] });
+        }
 
         const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('toss_snitch').setLabel('Snitch').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('confirm_send').setLabel('Confirm').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('cancel_send').setLabel('Cancel').setStyle(ButtonStyle.Secondary)
+        );
+
+        const verifyEmbed = new EmbedBuilder()
+            .setColor(EMBED_COLOR)
+            .setTitle('⚖️ Verifikasi Pengiriman Galleon')
+            .setDescription(`Apakah kamu yakin ingin mengirim **${sendAmount.toLocaleString()} Galleons** kepada ${targetUser}?`)
+            .setTimestamp();
+
+        const verifyMsg = await message.channel.send({ embeds: [verifyEmbed], components: [row] });
+
+        const filter = i => i.user.id === userId;
+        const collector = verifyMsg.createMessageComponentCollector({ filter, time: 30000 });
+
+        collector.on('collect', async i => {
+            if (i.customId === 'confirm_send') {
+                senderDoc.galleons -= sendAmount;
+                await senderDoc.save();
+
+                let receiverDoc = await User.findOne({ userId: targetUser.id, guildId: message.guild.id });
+                if (!receiverDoc) {
+                    receiverDoc = new User({ userId: targetUser.id, guildId: message.guild.id, xp: 0, level: 1, galleons: 0 });
+                }
+                receiverDoc.galleons = (receiverDoc.galleons || 0) + sendAmount;
+                await receiverDoc.save();
+
+                const successEmbed = new EmbedBuilder()
+                    .setColor(EMBED_COLOR)
+                    .setTitle('✅ Transaksi Berhasil')
+                    .setDescription(`Berhasil mengirim **${sendAmount.toLocaleString()} Galleons** kepada ${targetUser}!`)
+                    .setTimestamp();
+                await i.update({ embeds: [successEmbed], components: [] });
+            } else if (i.customId === 'cancel_send') {
+                const cancelEmbed = new EmbedBuilder()
+                    .setColor(EMBED_COLOR)
+                    .setTitle('❌ Transaksi Dibatalkan')
+                    .setDescription('Pengiriman Galleons dibatalkan oleh pengirim.')
+                    .setTimestamp();
+                await i.update({ embeds: [cancelEmbed], components: [] });
+            }
+        });
+
+        collector.on('end', collected => {
+            if (collected.size === 0) {
+                const timeoutEmbed = new EmbedBuilder()
+                    .setColor(EMBED_COLOR)
+                    .setTitle('⏰ Waktu Verifikasi Habis')
+                    .setDescription('Verifikasi transaksi pengiriman Galleons telah kedaluwarsa.')
+                    .setTimestamp();
+                verifyMsg.edit({ embeds: [timeoutEmbed], components: [] }).catch(console.error);
+            }
+        });
+        return;
+    }
+
+    // ==========================================
+    // MINI-GAMES KASINO SIHIR (Toss, Slot, Gobs, Snap, Snitch)
+    // ==========================================
+    if (command === '!toss') {
+        const betAmount = parseInt(args[1]);
+
+        if (isNaN(betAmount) || betAmount <= 0) {
+            const formatToss = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🔮 Format Coffin Toss Salah')
+                .setDescription('Gunakan format:\n`!toss <jumlah_galleon>`\n*(Contoh: `!toss 100`)*')
+                .setTimestamp();
+            return message.channel.send({ embeds: [formatToss] });
+        }
+
+        // --- CEK COOLDOWN 10 DETIK & COUNTDOWN ---
+        const isCooldown = await checkAndSetCooldown('toss');
+        if (isCooldown) return;
+
+        // Cek Maksimal Bet Limit
+        if (betAmount > MAX_BET_LIMIT) {
+            const maxLvlErr = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('⚠️ Batas Taruhan Terlampaui')
+                .setDescription(`Taruhan maksimal untuk Coffin Toss adalah **${MAX_BET_LIMIT.toLocaleString()} Galleons**!`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [maxLvlErr] });
+        }
+
+        let userDoc = await User.findOne({ userId, guildId: message.guild.id });
+        if (!userDoc || (userDoc.galleons || 0) < betAmount) {
+            const poorToss = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🪙 Saldo Tidak Cukup')
+                .setDescription(`Tabungan Galleon kamu tidak mencukupi untuk bertaruh sebesar **${betAmount.toLocaleString()} G**.\nSaldo saat ini: **${(userDoc ? userDoc.galleons : 0).toLocaleString()} G**`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [poorToss] });
+        }
+
+        const tossRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('toss_snitch').setLabel('Snitch Emas').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId('toss_bludger').setLabel('Bludger').setStyle(ButtonStyle.Secondary)
         );
-        const msg = await message.channel.send({ embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle('🎲 Coffin Toss').setDescription('Pilih sisi koinmu!')], components: [row] });
-        
-        const collector = msg.createMessageComponentCollector({ time: 30000 });
+
+        const tossEmbed = new EmbedBuilder()
+            .setColor(EMBED_COLOR)
+            .setTitle('🎲 Coffin Toss - Lempar Koin Naga')
+            .setDescription(`Taruhan: **${betAmount.toLocaleString()} Galleons**\n\nSilakan pilih sisi koin lemparanmu di bawah ini:`)
+            .setTimestamp();
+
+        const tossMsg = await message.channel.send({ embeds: [tossEmbed], components: [tossRow] });
+
+        const filter = i => i.user.id === userId;
+        const collector = tossMsg.createMessageComponentCollector({ filter, time: 30000 });
+
         collector.on('collect', async i => {
-            if (i.user.id !== userId) return;
             const choices = ['snitch', 'bludger'];
-            const botC = choices[Math.floor(Math.random() * choices.length)];
-            const win = (i.customId === `toss_${botC}`);
+            const botChoice = choices[Math.floor(Math.random() * choices.length)];
             
-            if (win) userDoc.galleons += betAmount;
-            else userDoc.galleons -= betAmount;
-            await userDoc.save();
+            const playerPick = i.customId === 'toss_snitch' ? 'snitch' : 'bludger';
             
-            await i.update({ embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription(`Koin mendarat pada: **${botC}**\n\n${win ? '🎉 Menang!' : '❌ Kalah!'}`)], components: [] });
+            let resultDesc = `Koin naga berputar...\nKoin mendarat pada sisi: **${botChoice === 'snitch' ? '🟡 Snitch Emas' : '🔴 Bludger'}**\n\n`;
+
+            if (playerPick === botChoice) {
+                userDoc.galleons += betAmount; 
+                await userDoc.save();
+                resultDesc += `🎉 **Kemenangan Hebat!** Tebakanmu tepat. Saldo Galleon bertambah **+${betAmount.toLocaleString()} G**!`;
+            } else {
+                userDoc.galleons -= betAmount; 
+                await userDoc.save();
+                resultDesc += `❌ **Sayang Sekali!** Tebakanmu meleset. Saldo Galleon terpotong **-${betAmount.toLocaleString()} G**!`;
+            }
+
+            const resultEmbed = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('✨ Hasil Coffin Toss Sihir')
+                .setDescription(resultDesc)
+                .setTimestamp();
+
+            await i.update({ embeds: [resultEmbed], components: [] });
+        });
+
+        collector.on('end', collected => {
+            if (collected.size === 0) {
+                const timeoutEmbed = new EmbedBuilder()
+                    .setColor(EMBED_COLOR)
+                    .setTitle('⏰ Waktu Taruhan Habis')
+                    .setDescription('Permainan Coffin Toss dibatalkan karena tidak ada respons pilihan.')
+                    .setTimestamp();
+                tossMsg.edit({ embeds: [timeoutEmbed], components: [] }).catch(console.error);
+            }
         });
         return;
     }
 
     if (command === '!slot') {
         const betAmount = parseInt(args[1]);
-        if (isNaN(betAmount) || betAmount <= 0) return message.channel.send({ embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle('🔮 Format Slot Salah').setDescription('Gunakan: `!slot <jumlah>`')] });
+
+        if (isNaN(betAmount) || betAmount <= 0) {
+            const formatSlot = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🔮 Format Mesin Slot Salah')
+                .setDescription('Gunakan format:\n`!slot <jumlah_galleon>`\n*(Contoh: `!slot 50`)*')
+                .setTimestamp();
+            return message.channel.send({ embeds: [formatSlot] });
+        }
+
+        // --- CEK COOLDOWN 10 DETIK & COUNTDOWN ---
         const isCooldown = await checkAndSetCooldown('slot');
         if (isCooldown) return;
 
+        // Cek Maksimal Bet Limit
+        if (betAmount > MAX_BET_LIMIT) {
+            const maxLvlErr = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('⚠️ Batas Taruhan Terlampaui')
+                .setDescription(`Taruhan maksimal untuk Mesin Slot adalah **${MAX_BET_LIMIT.toLocaleString()} Galleons**!`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [maxLvlErr] });
+        }
+
         let userDoc = await User.findOne({ userId, guildId: message.guild.id });
-        if (!userDoc || (userDoc.galleons || 0) < betAmount) return message.channel.send({ embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle('🪙 Saldo Kurang').setDescription('Galleons tidak cukup.')] });
+        if (!userDoc || (userDoc.galleons || 0) < betAmount) {
+            const poorSlot = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🪙 Saldo Tidak Cukup')
+                .setDescription(`Tabungan Galleon kamu tidak mencukupi untuk bermain slot sebesar **${betAmount.toLocaleString()} G**.\nSaldo saat ini: **${(userDoc ? userDoc.galleons : 0).toLocaleString()} G**`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [poorSlot] });
+        }
 
-        const createEmbed = (s1, s2, s3, txt) => new EmbedBuilder().setColor(EMBED_COLOR).setDescription(`**[ ${s1} | ${s2} | ${s3} ]**\n\n${txt}`);
-        const msg = await message.channel.send({ embeds: [createEmbed('🌀','🌀','🌀','Mesin slot mulai berputar...')] });
-        
+        const createSlotEmbed = (s1, s2, s3, text) => {
+            return new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🎰 Gringotts Vault - Mesin Slot Sihir')
+                .setDescription(`Taruhan: **${betAmount.toLocaleString()} Galleons**\n\n**[  ${s1}  |  ${s2}  |  ${s3}  ]**\n\n${text}`)
+                .setTimestamp();
+        };
+
+        const slotMsg = await message.channel.send({ 
+            embeds: [createSlotEmbed('🌀', '🌀', '🌀', '*Mantra gulungan mesin slot mulai berputar...* 🌀')] 
+        });
+
+        const rollRng = Math.random();
         const items = ['🏺', '🧹', '🎩', '🪙'];
-        const r = Math.random();
-        let i1, i2, i3, mult = 0;
-        
-        if (r < 0.75) { i1 = items[0]; i2 = items[1]; i3 = items[2]; }
-        else if (r < 0.87) { i1 = '🏺'; i2 = '🏺'; i3 = '🏺'; mult = 5; } 
-        else if (r < 0.92) { i1 = '🧹'; i2 = '🧹'; i3 = '🧹'; mult = 10; } 
-        else if (r < 0.94) { i1 = '🎩'; i2 = '🎩'; i3 = '🎩'; mult = 15; } 
-        else { i1 = '🪙'; i2 = '🪙'; i3 = '🪙'; mult = 30; }
+        let rolled1, rolled2, rolled3;
+        let multiplier = 0;
 
-        setTimeout(() => msg.edit({ embeds: [createEmbed(i1, '🌀', '🌀', 'Slot 1 terkunci...')] }), 1200);
-        setTimeout(() => msg.edit({ embeds: [createEmbed(i1, i2, '🌀', 'Slot 2 terkunci...')] }), 2400);
+        if (rollRng < 0.75) {
+            rolled1 = items[Math.floor(Math.random() * items.length)];
+            do { rolled2 = items[Math.floor(Math.random() * items.length)]; } while (rolled2 === rolled1);
+            do { rolled3 = items[Math.floor(Math.random() * items.length)]; } while (rolled3 === rolled1 || rolled3 === rolled2);
+        } else if (rollRng < 0.87) { rolled1 = '🏺'; rolled2 = '🏺'; rolled3 = '🏺'; multiplier = 5; } 
+        else if (rollRng < 0.92) { rolled1 = '🧹'; rolled2 = '🧹'; rolled3 = '🧹'; multiplier = 10; } 
+        else if (rollRng < 0.94) { rolled1 = '🎩'; rolled2 = '🎩'; rolled3 = '🎩'; multiplier = 15; } 
+        else { rolled1 = '🪙'; rolled2 = '🪙'; rolled3 = '🪙'; multiplier = 30; } 
+
+        setTimeout(() => {
+            slotMsg.edit({ 
+                embeds: [createSlotEmbed(rolled1, '🌀', '🌀', '*Slot pertama terkunci...* 🔒')] 
+            });
+        }, 1200);
+
+        setTimeout(() => {
+            slotMsg.edit({ 
+                embeds: [createSlotEmbed(rolled1, rolled2, '🌀', '*Slot kedua terkunci...* 🔒')] 
+            });
+        }, 2400);
+
         setTimeout(async () => {
-            if (mult > 0) userDoc.galleons += (betAmount * mult) - betAmount;
-            else { userDoc.galleons -= betAmount; userDoc.houseVault = (userDoc.houseVault || 0) + betAmount; }
-            await userDoc.save();
-            msg.edit({ embeds: [createEmbed(i1, i2, i3, mult > 0 ? `🎉 Jackpot (x${mult})!` : '💸 Zonk!')] });
-        }, 3600);
+            if (multiplier > 0) {
+                userDoc.galleons += (betAmount * multiplier) - betAmount;
+                await userDoc.save();
+            } else {
+                userDoc.galleons -= betAmount;
+                userDoc.houseVault = (userDoc.houseVault || 0) + betAmount; 
+                await userDoc.save();
+            }
+
+            let resultText = '';
+            if (multiplier > 0) {
+                resultText = `🎉 **JACKPOT (x${multiplier})!** Selamat, murid yang luar biasa! Kamu memenangkan **+${(betAmount * multiplier).toLocaleString()} Galleons**!`;
+            } else {
+                resultText = `💸 Zonk! Gulungan tidak ada yang kembar.\nTaruhan hangus dan berhasil disetorkan ke **Pundi-pundi Kas Asrama**!`;
+            }
+
+            slotMsg.edit({ 
+                embeds: [createSlotEmbed(rolled1, rolled2, rolled3, resultText)] 
+            });
+        }, 3600); 
+
         return;
     }
 
     if (command === '!gobs') {
         const betAmount = parseInt(args[1]);
-        if (isNaN(betAmount) || betAmount <= 0) return message.reply('Gunakan: `!gobs <jumlah>`');
+
+        if (isNaN(betAmount) || betAmount <= 0) {
+            const formatG = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🔮 Format Taruhan Gobstones Salah')
+                .setDescription('Gunakan format:\n`!gobs <jumlah_galleon>`\n*(Contoh: `!gobs 50`)*')
+                .setTimestamp();
+            return message.channel.send({ embeds: [formatG] });
+        }
+
+        // --- CEK COOLDOWN 10 DETIK & COUNTDOWN ---
         const isCooldown = await checkAndSetCooldown('gobs');
         if (isCooldown) return;
 
-        let userDoc = await User.findOne({ userId, guildId: message.guild.id });
-        if (!userDoc || userDoc.galleons < betAmount) return message.reply('Galleon kurang.');
+        // Cek Maksimal Bet Limit
+        if (betAmount > MAX_BET_LIMIT) {
+            const maxLvlErr = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('⚠️ Batas Taruhan Terlampaui')
+                .setDescription(`Taruhan maksimal untuk Gobstones Risk adalah **${MAX_BET_LIMIT.toLocaleString()} Galleons**!`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [maxLvlErr] });
+        }
 
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('gobs_besar').setLabel('Besar').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId('gobs_kecil').setLabel('Kecil').setStyle(ButtonStyle.Secondary)
+        let userDoc = await User.findOne({ userId, guildId: message.guild.id });
+        if (!userDoc || (userDoc.galleons || 0) < betAmount) {
+            const poorG = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🪙 Saldo Tidak Cukup')
+                .setDescription(`Tabunganmu tidak mencukupi bertaruh Gobstones sebesar **${betAmount.toLocaleString()} G**.\nSaldo saat ini: **${(userDoc ? userDoc.galleons : 0).toLocaleString()} G**`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [poorG] });
+        }
+
+        const gobsRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('gobs_besar').setLabel('Besar (8-12)').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('gobs_kecil').setLabel('Kecil (2-7)').setStyle(ButtonStyle.Secondary)
         );
-        const msg = await message.channel.send({ embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle('🎲 Gobstones Risk').setDescription('Pilih Besar (8-12) atau Kecil (2-7)')], components: [row] });
-        
-        const c = msg.createMessageComponentCollector({ time: 30000 });
-        c.on('collect', async i => {
-            if (i.user.id !== userId) return;
-            const d1 = Math.floor(Math.random() * 6) + 1;
-            const d2 = Math.floor(Math.random() * 6) + 1;
-            const tot = d1 + d2;
-            const actual = tot >= 8 ? 'besar' : 'kecil';
-            const win = i.customId === `gobs_${actual}`;
+
+        const gobsEmbed = new EmbedBuilder()
+            .setColor(EMBED_COLOR)
+            .setTitle('🎲 Gobstones Risk - Tebak Dadu Ajaib')
+            .setDescription(`Taruhan: **${betAmount.toLocaleString()} Galleons**\n\nSilakan pilih tebakan total lemparan dua dadu di bawah ini:\n*(Besar: 8 - 12 | Kecil: 2 - 7)*`)
+            .setTimestamp();
+
+        const gobsMsg = await message.channel.send({ embeds: [gobsEmbed], components: [gobsRow] });
+
+        const filter = i => i.user.id === userId;
+        const collector = gobsMsg.createMessageComponentCollector({ filter, time: 30000 });
+
+        collector.on('collect', async i => {
+            const playerGuess = i.customId === 'gobs_besar' ? 'besar' : 'kecil';
             
-            if (win) userDoc.galleons += betAmount;
-            else { userDoc.galleons -= betAmount; userDoc.houseVault = (userDoc.houseVault || 0) + betAmount; }
-            await userDoc.save();
+            const dice1 = Math.floor(Math.random() * 6) + 1;
+            const dice2 = Math.floor(Math.random() * 6) + 1;
+            const total = dice1 + dice2;
+            const resultActual = (total >= 8) ? 'besar' : 'kecil';
+
+            let resultText = '';
+            if (playerGuess === resultActual) {
+                userDoc.galleons += betAmount; 
+                await userDoc.save();
+                resultText = `🎉 **Menang!** Dadu mengocok angka **${dice1}** dan **${dice2}** (Total: ${total}). Tebakanmu tepat!\n\nHadiah: **+${(betAmount * 2).toLocaleString()} Galleons**`;
+            } else {
+                userDoc.galleons -= betAmount;
+                userDoc.houseVault = (userDoc.houseVault || 0) + betAmount; 
+                await userDoc.save();
+                resultText = `💥 **Kena Semprot!** Dadu mengocok angka **${dice1}** dan **${dice2}** (Total: ${total}). Tebakanmu meleset, Gobstones menyemprotkan cairan bau!\n\nTaruhan hangus: **-${betAmount.toLocaleString()} Galleons** masuk ke Kas Asrama.`;
+            }
+
+            const embedResult = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('✨ Hasil Gobstones Risk')
+                .setDescription(`Taruhan: **${betAmount.toLocaleString()} G** | Pilihan: **${playerGuess.toUpperCase()}**\n\n${resultText}`)
+                .setTimestamp();
             
-            i.update({ embeds: [new EmbedBuilder().setDescription(`Total Dadu: **${tot}** (${d1} + ${d2})\n\n${win ? '🎉 Menang!' : '💥 Zonk!'}`)], components: [] });
+            await i.update({ embeds: [embedResult], components: [] });
         });
+
+        collector.on('end', collected => {
+            if (collected.size === 0) {
+                const timeoutEmbed = new EmbedBuilder()
+                    .setColor(EMBED_COLOR)
+                    .setTitle('⏰ Waktu Taruhan Habis')
+                    .setDescription('Permainan Gobstones dibatalkan karena tidak ada respons pilihan.')
+                    .setTimestamp();
+                gobsMsg.edit({ embeds: [timeoutEmbed], components: [] }).catch(console.error);
+            }
+        });
+
         return;
     }
 
     if (command === '!snap') {
         const betAmount = parseInt(args[1]);
-        if (isNaN(betAmount) || betAmount <= 0) return message.reply('Gunakan: `!snap <jumlah>`');
+
+        if (isNaN(betAmount) || betAmount <= 0) {
+            const formatS = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🔮 Format Exploding Snap Salah')
+                .setDescription('Gunakan format:\n`!snap <jumlah_galleon>`\n*(Contoh: `!snap 100`)*')
+                .setTimestamp();
+            return message.channel.send({ embeds: [formatS] });
+        }
+
+        // --- CEK COOLDOWN 10 DETIK & COUNTDOWN ---
         const isCooldown = await checkAndSetCooldown('snap');
         if (isCooldown) return;
 
+        // Cek Maksimal Bet Limit
+        if (betAmount > MAX_BET_LIMIT) {
+            const maxLvlErr = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('⚠️ Batas Taruhan Terlampaui')
+                .setDescription(`Taruhan maksimal untuk Exploding Snap adalah **${MAX_BET_LIMIT.toLocaleString()} Galleons**!`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [maxLvlErr] });
+        }
+
         let userDoc = await User.findOne({ userId, guildId: message.guild.id });
-        if (!userDoc || userDoc.galleons < betAmount) return message.reply('Galleon kurang.');
+        if (!userDoc || (userDoc.galleons || 0) < betAmount) {
+            const poorS = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🪙 Saldo Tidak Cukup')
+                .setDescription(`Tabunganmu tidak mencukupi bermain Exploding Snap sebesar **${betAmount.toLocaleString()} G**.\nSaldo saat ini: **${(userDoc ? userDoc.galleons : 0).toLocaleString()} G**`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [poorS] });
+        }
 
-        let p1 = Math.floor(Math.random() * 10) + 1, p2 = Math.floor(Math.random() * 10) + 1;
-        let pCards = [p1, p2], pTotal = p1 + p2;
-        let b1 = Math.floor(Math.random() * 10) + 1, b2 = Math.floor(Math.random() * 10) + 1;
-        let bCards = [b1, b2], bTotal = b1 + b2;
+        // Inisialisasi Kartu Pemain dan Bot
+        let playerCard1 = Math.floor(Math.random() * 10) + 1;
+        let playerCard2 = Math.floor(Math.random() * 10) + 1;
+        let playerCards = [playerCard1, playerCard2];
+        let playerTotal = playerCard1 + playerCard2;
 
-        const runAI = () => {
-            while (bTotal < 17 && Math.random() < 0.6) {
-                bTotal += Math.floor(Math.random() * 10) + 1;
+        let botCard1 = Math.floor(Math.random() * 10) + 1;
+        let botCard2 = Math.floor(Math.random() * 10) + 1;
+        let botCards = [botCard1, botCard2];
+        let botTotal = botCard1 + botCard2;
+
+        // Fungsi Kecerdasan Buatan Bot (AI Holds/Hits)
+        const runBotAI = () => {
+            while (botTotal < 17 && Math.random() < 0.6) {
+                const newBotCard = Math.floor(Math.random() * 10) + 1;
+                botCards.push(newBotCard);
+                botTotal += newBotCard;
             }
         };
 
-        const embed = () => new EmbedBuilder().setColor(EMBED_COLOR).setDescription(`**Kartu Anda:** [${pCards.join('][')}] (Total: **${pTotal}**)\n**Kartu Bot:** [${bCards[0]}][ ? ]`);
-        const row = new ActionRowBuilder().addComponents(
+        const createSnapEmbed = (pCards, pTotal, bCards, bTotal, roundStatus) => {
+            return new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🃏 Exploding Snap - Magic Blackjack')
+                .setDescription(`Taruhan: **${betAmount.toLocaleString()} G**\n\n${roundStatus}\n\n**Kartu Anda:** [${pCards.join('] [')}] (Total: **${pTotal}**)\n**Kartu Bot (Hogwarts):** [${bCards[0]}] [ ? ] (Total Rahasia)`)
+                .setTimestamp();
+        };
+
+        // Button Hit berwarna Hijau (Success), Button Open berwarna Merah (Danger)
+        const snapRow = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('snap_hit').setLabel('Hit').setStyle(ButtonStyle.Success),
             new ButtonBuilder().setCustomId('snap_open').setLabel('Open').setStyle(ButtonStyle.Danger)
         );
-        const msg = await message.channel.send({ embeds: [embed()], components: [row] });
-        
-        const c = msg.createMessageComponentCollector({ time: 120000 });
-        c.on('collect', async i => {
-            if (i.user.id !== userId) return;
+
+        const snapMsg = await message.channel.send({
+            embeds: [createSnapEmbed(playerCards, playerTotal, botCards, botTotal, '*Membagi tumpukan kartu sihir panas...*')],
+            components: [snapRow]
+        });
+
+        const filter = i => i.user.id === userId;
+        const collector = snapMsg.createMessageComponentCollector({ filter, time: 120000 });
+
+        collector.on('collect', async i => {
             if (i.customId === 'snap_hit') {
-                pTotal += Math.floor(Math.random() * 10) + 1;
-                pCards.push('⚡');
-                if (pTotal > 21) {
-                    c.stop(); runAI();
+                const newCard = Math.floor(Math.random() * 10) + 1;
+                playerCards.push(newCard);
+                playerTotal += newCard;
+
+                if (playerTotal > 21) {
+                    // Otomatis Selesai & Kalah Jika Melebihi 21 (Bust)
+                    collector.stop();
+                    runBotAI();
+
                     userDoc.galleons -= betAmount;
                     userDoc.houseVault = (userDoc.houseVault || 0) + betAmount;
-                    await userDoc.save();
-                    i.update({ embeds: [new EmbedBuilder().setDescription(`💥 BUST!\n\nAnda: ${pTotal} | Bot: ${bTotal}`)], components: [] });
+                    await awaitDocSaveWithRetry(userDoc);
+
+                    const finalResultBust = new EmbedBuilder()
+                        .setColor(EMBED_COLOR)
+                        .setTitle('💥 Hasil Akhir Exploding Snap')
+                        .setDescription(`Taruhan: **${betAmount.toLocaleString()} G**\n\n❌ **KARTU ANDA MELEDAK (BUST)!** Total Anda melebihi batas 21.\n\n**Kartu Anda:** [${playerCards.join('] [')}] (Total: **${playerTotal}**)\n**Kartu Bot:** [${botCards.join('] [')}] (Total: **${botTotal}**)\n\nTaruhan hangus: **-${betAmount.toLocaleString()} G** masuk ke Kas Asrama.`)
+                        .setTimestamp();
+
+                    return await i.update({ embeds: [finalResultBust], components: [] });
                 } else {
-                    i.update({ embeds: [embed()], components: [row] });
+                    const hitStatusEmbed = createSnapEmbed(playerCards, playerTotal, botCards, botTotal, '⭐ *Anda mengambil kartu tambahan.*');
+                    return await i.update({ embeds: [hitStatusEmbed], components: [snapRow] });
                 }
             } else if (i.customId === 'snap_open') {
-                c.stop(); runAI();
-                if (Math.random() < 0.35 ? (pTotal <= 21 && pTotal > bTotal) : false) {
-                    userDoc.galleons += betAmount;
-                } else {
-                    userDoc.galleons -= betAmount; userDoc.houseVault = (userDoc.houseVault || 0) + betAmount;
+                collector.stop();
+                runBotAI();
+
+                // 65:35 WIN LOSS LOGIC CHANCE DI-SET SESUAI PERMINTAAN
+                const winRng = Math.random();
+                // User Win (Probabilitas 35%)
+                if (winRng < 0.35) {
+                    if (playerTotal <= 21 && (botTotal > 21 || playerTotal > botTotal)) {
+                        userDoc.galleons += (betAmount * 2);
+                        await awaitDocSaveWithRetry(userDoc);
+                    } else {
+                        playerTotal = botTotal <= 21 ? botTotal + 1 : 21;
+                        if (playerTotal > 21) playerTotal = 20; 
+                        userDoc.galleons += (betAmount * 2);
+                        await awaitDocSaveWithRetry(userDoc);
+                    }
+                } 
+                // Bot Win (Probabilitas 65%)
+                else {
+                    if (botTotal <= 21 && (playerTotal > 21 || botTotal >= playerTotal)) {
+                        userDoc.galleons -= betAmount;
+                        userDoc.houseVault = (userDoc.houseVault || 0) + betAmount;
+                        await awaitDocSaveWithRetry(userDoc);
+                    } else {
+                        botTotal = playerTotal <= 21 ? playerTotal + 1 : 21;
+                        if (botTotal > 21) botTotal = 20;
+                        userDoc.galleons -= betAmount;
+                        userDoc.houseVault = (userDoc.houseVault || 0) + betAmount;
+                        await awaitDocSaveWithRetry(userDoc);
+                    }
                 }
-                await userDoc.save();
-                i.update({ embeds: [new EmbedBuilder().setDescription(`Selesai.\n\nAnda: **${pTotal}** | Bot: **${bTotal}**`)], components: [] });
+
+                let gameResultDesc = '';
+                if (playerTotal <= 21 && (botTotal > 21 || playerTotal > botTotal)) {
+                    gameResultDesc = `🎉 **Kemenangan Hebat!** Kartu Anda lebih mendekati angka 21!\n\nHadiah: **+${(betAmount * 2).toLocaleString()} Galleons**`;
+                } else if (botTotal <= 21 && (playerTotal > 21 || botTotal >= playerTotal)) {
+                    gameResultDesc = `💥 **Kalah!** Kartu Bot Hogwarts lebih mendekati batas 21 / sama kuat.\n\nTaruhan hangus: **-${betAmount.toLocaleString()} G** masuk ke Kas Asrama.`;
+                } else {
+                    gameResultDesc = `💥 **Kedua Kartu Meledak (Bust)!** Karena lebih dulu meledak, permainan dimenangkan pihak kasino.\n\nTaruhan hangus: **-${betAmount.toLocaleString()} G** masuk ke Kas Asrama.`;
+                }
+
+                const finalResultOpen = new EmbedBuilder()
+                    .setColor(EMBED_COLOR)
+                    .setTitle('🃏 Hasil Akhir Exploding Snap')
+                    .setDescription(`Taruhan: **${betAmount.toLocaleString()} G**\n\n${gameResultDesc}\n\n**Kartu Anda:** [${playerCards.join('] [')}] (Total: **${playerTotal}**)\n**Kartu Bot:** [${botCards.join('] [')}] (Total: **${botTotal}**)`)
+                    .setTimestamp();
+
+                return await i.update({ embeds: [finalResultOpen], components: [] });
             }
         });
+
+        collector.on('end', collected => {
+            if (collected.size === 0) {
+                const timeoutEmbed = new EmbedBuilder()
+                    .setColor(EMBED_COLOR)
+                    .setTitle('⏰ Waktu Taruhan Habis')
+                    .setDescription('Permainan Exploding Snap dibatalkan karena tidak ada respons verifikasi.')
+                    .setTimestamp();
+                snapMsg.edit({ embeds: [timeoutEmbed], components: [] }).catch(console.error);
+            }
+        });
+
         return;
     }
 
     if (command === '!snitch') {
         const betAmount = parseInt(args[1]);
-        if (isNaN(betAmount) || betAmount <= 0) return message.reply('Gunakan: `!snitch <jumlah>`');
+
+        if (isNaN(betAmount) || betAmount <= 0) {
+            const formatSn = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🔮 Format Tangkap Snitch Salah')
+                .setDescription('Gunakan format:\n`!snitch <jumlah_galleon>`\n*(Contoh: `!snitch 200`)*')
+                .setTimestamp();
+            return message.channel.send({ embeds: [formatSn] });
+        }
+
+        // --- CEK COOLDOWN 10 DETIK & COUNTDOWN ---
         const isCooldown = await checkAndSetCooldown('snitch');
         if (isCooldown) return;
 
-        let userDoc = await User.findOne({ userId, guildId: message.guild.id });
-        if (!userDoc || userDoc.galleons < betAmount) return message.reply('Galleon kurang.');
+        // Cek Maksimal Bet Limit
+        if (betAmount > MAX_BET_LIMIT) {
+            const maxLvlErr = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('⚠️ Batas Taruhan Terlampaui')
+                .setDescription(`Taruhan maksimal untuk Golden Snitch Catch adalah **${MAX_BET_LIMIT.toLocaleString()} Galleons**!`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [maxLvlErr] });
+        }
 
-        const rows = [
-            new ActionRowBuilder().addComponents([1,2,3,4,5].map(n => new ButtonBuilder().setCustomId(`sn_${n}`).setLabel(n.toString()).setStyle(ButtonStyle.Secondary))),
-            new ActionRowBuilder().addComponents([6,7,8,9,10].map(n => new ButtonBuilder().setCustomId(`sn_${n}`).setLabel(n.toString()).setStyle(ButtonStyle.Secondary)))
+        let userDoc = await User.findOne({ userId, guildId: message.guild.id });
+        if (!userDoc || (userDoc.galleons || 0) < betAmount) {
+            const poorSn = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('🪙 Saldo Tidak Cukup')
+                .setDescription(`Tabunganmu tidak mencukupi untuk menangkap Snitch sebesar **${betAmount.toLocaleString()} G**.\nSaldo saat ini: **${(userDoc ? userDoc.galleons : 0).toLocaleString()} G**`)
+                .setTimestamp();
+            return message.channel.send({ embeds: [poorSn] });
+        }
+
+        const snitchRows = [
+            new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('snitch_1').setLabel('1').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('snitch_2').setLabel('2').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('snitch_3').setLabel('3').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('snitch_4').setLabel('4').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('snitch_5').setLabel('5').setStyle(ButtonStyle.Secondary)
+            ),
+            new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('snitch_6').setLabel('6').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('snitch_7').setLabel('7').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('snitch_8').setLabel('8').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('snitch_9').setLabel('9').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('snitch_10').setLabel('10').setStyle(ButtonStyle.Secondary)
+            )
         ];
-        const msg = await message.channel.send({ embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle('⚡ Golden Snitch Catch').setDescription('Pilih nomor keberuntungan (1-10):')], components: rows });
-        
-        const c = msg.createMessageComponentCollector({ time: 30000 });
-        c.on('collect', async i => {
-            const guess = parseInt(i.customId.split('_')[1]);
-            const target = Math.floor(Math.random() * 10) + 1;
-            
-            if (guess === target) {
-                userDoc.galleons += betAmount * 5;
-                await userDoc.save();
-                i.update({ embeds: [new EmbedBuilder().setDescription(`🏆 Jackpot! Angka **${target}** tepat.\n\nHadiah: +${(betAmount * 5).toLocaleString()}`)], components: [] });
-            } else {
-                userDoc.galleons -= betAmount;
-                userDoc.houseVault = (userDoc.houseVault || 0) + betAmount;
-                await userDoc.save();
-                i.update({ embeds: [new EmbedBuilder().setDescription(`❌ Meleset! Snitch menghindar ke angka **${target}**.\n\nTaruhan hangus: -${betAmount.toLocaleString()}`)], components: [] });
+
+        const snitchEmbed = new EmbedBuilder()
+            .setColor(EMBED_COLOR)
+            .setTitle('⚡ Golden Snitch Catch - Pilih Angka Keberuntungan')
+            .setDescription(`Taruhan: **${betAmount.toLocaleString()} Galleons**\n\nSilakan tentukan nomor keberuntungan bola bersayap di bawah ini (1 - 10):`)
+            .setTimestamp();
+
+        const snitchMsg = await message.channel.send({ embeds: [snitchEmbed], components: snitchRows });
+
+        const filter = i => i.user.id === userId;
+        const collector = snitchMsg.createMessageComponentCollector({ filter, time: 30000 });
+
+        collector.on('collect', async i => {
+            const guessNumber = parseInt(i.customId.replace('snitch_', ''));
+
+            // Efek Animasi Tangkap
+            const waitEmbed = new EmbedBuilder()
+                .setColor(EMBED_COLOR)
+                .setTitle('⚡ Mengejar Golden Snitch...')
+                .setDescription('Mantra melesat cepat, bola bersayap emas terbang kesana kemari...')
+                .setTimestamp();
+            await i.update({ embeds: [waitEmbed], components: [] });
+
+            setTimeout(async () => {
+                const targetNumber = Math.floor(Math.random() * 10) + 1;
+                const wingColor = Math.random() > 0.5 ? '🟡 Sayap Emas' : '⚪ Sayap Perak';
+
+                let resultText = '';
+                if (guessNumber === targetNumber) {
+                    userDoc.galleons += (betAmount * 5); 
+                    await awaitDocSaveWithRetry(userDoc);
+                    resultText = `🏆 **JACKPOT SNITCH!** Sayap: ${wingColor}. Pilihanmu tepat mengenai angka **${targetNumber}** di udara!\n\nHadiah Jackpot (x5): **+${(betAmount * 6).toLocaleString()} Galleons**`;
+                } else {
+                    userDoc.galleons -= betAmount;
+                    userDoc.houseVault = (userDoc.houseVault || 0) + betAmount; 
+                    await awaitDocSaveWithRetry(userDoc);
+                    resultText = `❌ **Meleset!** Sayap: ${wingColor}. Snitch menghindar ke angka **${targetNumber}**. Sayang sekali kamu tidak berhasil menangkapnya.\n\nTaruhan hangus: **-${betAmount.toLocaleString()} G** masuk ke Kas Asrama.`;
+                }
+
+                const embedResultSn = new EmbedBuilder()
+                    .setColor(EMBED_COLOR)
+                    .setTitle('✨ Hasil Golden Snitch Catch')
+                    .setDescription(`Taruhan: **${betAmount.toLocaleString()} G** | Pilihan Angka: **${guessNumber}**\n\n${resultText}`)
+                    .setTimestamp();
+                
+                await snitchMsg.edit({ embeds: [embedResultSn], components: [] });
+            }, 3000);
+        });
+
+        collector.on('end', collected => {
+            if (collected.size === 0) {
+                const timeoutEmbed = new EmbedBuilder()
+                    .setColor(EMBED_COLOR)
+                    .setTitle('⏰ Waktu Taruhan Habis')
+                    .setDescription('Permainan Tangkap Snitch dibatalkan karena tidak ada respons sentuhan tombol.')
+                    .setTimestamp();
+                snitchMsg.edit({ embeds: [timeoutEmbed], components: [] }).catch(console.error);
             }
         });
+
         return;
     }
 
+    // D. GENERAL MAGICAL COMMANDS (Profile, Leaderboard, Student)
     if (command === '!profile') {
         const targetUser = message.mentions.users.first() || message.author;
         const targetMember = message.guild.members.cache.get(targetUser.id);
         
-        if (!targetMember) return message.reply('❌ User tidak ditemukan.');
+        if (!targetMember) {
+            return message.reply('❌ Terjadi kesalahan: Penyihir tidak ditemukan di dalam cache server ini. Coba lagi nanti.');
+        }
 
-        let userLevel, userXp, xpNeeded, wizardTitle, userGalleons = 0;
-        let equippedTitleText = 'Tidak ada gelar terpasang';
-        let equippedPetText = 'Tidak ada peliharaan';
+        let userLevel, userXp, xpNeeded, wizardTitle;
+        let pointsContributed = 0; 
+        let userGalleons = 0;
 
         if (targetUser.id === OWNER_ID) {
-            userLevel = 9999; userXp = 0; xpNeeded = 100; wizardTitle = 'Lord of Magic'; userGalleons = 999999;
-            equippedTitleText = 'Lord of Magic'; equippedPetText = 'Phoenix Legendaris';
+            userLevel = 9999;
+            userXp = 0; 
+            xpNeeded = getXpNeededForNextLevel(userLevel); 
+            wizardTitle = 'Lord of Magic';
+            
+            let ownerDoc = await User.findOne({ userId: targetUser.id, guildId: message.guild.id });
+            userGalleons = ownerDoc ? (ownerDoc.galleons || 0) : 999999;
         } else {
             let userDoc = await User.findOne({ userId: targetUser.id, guildId: message.guild.id });
             if (!userDoc) {
                 userDoc = new User({ userId: targetUser.id, guildId: message.guild.id, xp: 0, level: 1, galleons: 0 });
                 await userDoc.save();
             }
-            await migrateUserLevel(userDoc);
             
-            userLevel = userDoc.level; userXp = userDoc.xp;
+            userLevel = userDoc.level;
+            userXp = userDoc.xp;
             xpNeeded = getXpNeededForNextLevel(userLevel);
             wizardTitle = getWizardTitle(userLevel, targetUser.id);
             userGalleons = userDoc.galleons || 0;
-            equippedTitleText = userDoc.equippedTitle || 'Tidak ada gelar terpasang';
-            equippedPetText = userDoc.equippedPetName || 'Tidak ada peliharaan';
         }
         
         const targetHouse = HOUSES_DATA.find(h => targetMember.roles.cache.has(h.id));
         const houseName = targetHouse ? `${targetHouse.emoji} \`${targetHouse.name}\`` : 'Belum Masuk Asrama';
 
-        const progress = Math.min(Math.floor((userXp / xpNeeded) * 100), 100);
-        const bar = '▓'.repeat(Math.floor((progress/100)*15)) + '░'.repeat(15 - Math.floor((progress/100)*15));
+        const progressPercentage = targetUser.id === OWNER_ID ? 100 : Math.min(Math.floor((userXp / xpNeeded) * 100), 100);
+        
+        const totalBlocks = 15;
+        const filledBlocks = Math.floor((progressPercentage / 100) * totalBlocks);
+        const emptyBlocks = totalBlocks - filledBlocks;
+        const visualBar = '▓'.repeat(filledBlocks) + '░'.repeat(emptyBlocks);
 
         const profileEmbed = new EmbedBuilder()
             .setColor(EMBED_COLOR)
-            .setAuthor({ name: `✨ WIZARD PROFILE — ${targetUser.username.toUpperCase()} ✨`, iconURL: targetUser.displayAvatarURL() })
+            .setAuthor({ 
+                name: `✨ WIZARD PROFILE — ${targetUser.username.toUpperCase()} ✨`, 
+                iconURL: targetUser.displayAvatarURL({ dynamic: true }) 
+            })
+            .setDescription('Selamat datang di **Hogwarts Academy Magic System** 🏰✨')
             .addFields(
-                { name: '🧙‍♂️ Nama', value: `\`${targetUser.username}\``, inline: true },
+                { name: '🧙‍♂️ Nama Penyihir', value: `\`${targetUser.username}\``, inline: true },
                 { name: '🏷️ Gelar Sihir', value: `\`${wizardTitle}\``, inline: true },
-                { name: '🏰 Asrama', value: houseName, inline: true },
-                { name: '⭐ Level', value: `\`${userLevel}\``, inline: true },
-                { name: '🪙 Galleons', value: `\`${userGalleons.toLocaleString()} G\``, inline: true },
-                { name: '\u200B', value: '\u200B' },
-                { name: '📜 Equipped Title', value: `\`${equippedTitleText}\``, inline: true },
-                { name: '🐾 Peliharaan', value: `\`${equippedPetText}\``, inline: true },
-                { name: '\u200B', value: '\u200B' },
-                { name: `📈 Progress Level (${progress}%)`, value: `\`[${bar}]\` ⚡ **${userXp.toLocaleString()} / ${xpNeeded.toLocaleString()} XP**` }
+                { name: '🏰 Asrama Hogwarts', value: `${houseName}`, inline: true },
+                { name: '⭐ Level Saat Ini', value: `\`${userLevel}\``, inline: true },
+                { name: '🏆 Poin Kontribusi', value: `\`${pointsContributed.toLocaleString()} Poin\``, inline: true },
+                { name: '🪙 Saldo Tabungan', value: `\`${userGalleons.toLocaleString()} Galleons\``, inline: true },
+                { name: '\u200B', value: '\u200B' }, 
+                { 
+                    name: `📈 Progress Menuju Level Berikutnya (${progressPercentage}%)`, 
+                    value: `\`[${visualBar}]\`\n⚡ **${userXp.toLocaleString()} / ${xpNeeded.toLocaleString()} XP**` 
+                }
             )
-            .setTimestamp();
+            .setTimestamp()
+            .setFooter({ text: 'Hogwarts Academy Magic System', iconURL: client.user.displayAvatarURL() });
 
         await message.channel.send({ embeds: [profileEmbed] });
         return;
     }
 
+    if (command === '!leaderboard') {
+        const sortedHouses = Object.entries(housePointsCache).sort((a, b) => b[1] - a[1]);
+
+        const lbEmbed = new EmbedBuilder()
+            .setColor(EMBED_COLOR) 
+            .setTitle('🏆 House Cup Tournament - Leaderboard')
+            .setDescription('Klasemen asrama Hogwarts saat ini:\n\n' + sortedHouses.map((house, index) => {
+                const houseMeta = HOUSES_DATA.find(h => h.name === house[0]);
+                const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '📜';
+                return `${medal} **Rank ${index + 1}**: ${houseMeta.emoji} **${house[0]}** — \`${house[1].toLocaleString()} Poin\``;
+            }).join('\n'))
+            .setTimestamp();
+
+        return message.channel.send({ embeds: [lbEmbed] });
+    }
+
+    if (command === '!student') {
+        await message.guild.members.fetch();
+
+        const embed = new EmbedBuilder()
+            .setColor(EMBED_COLOR)
+            .setTitle('🎓 Hogwarts Academy Student Roster')
+            .setDescription('Daftar seluruh murid aktif yang telah dikelompokkan ke asrama masing-masing.')
+            .setTimestamp()
+            .setFooter({ text: 'Hogwarts Academy Roster System', iconURL: client.user.displayAvatarURL() });
+
+        for (const house of HOUSES_DATA) {
+            const membersInHouse = message.guild.members.cache.filter(member => 
+                member.roles.cache.has(house.id) && !member.user.bot
+            );
+
+            let houseList = '';
+            if (membersInHouse.size === 0) {
+                houseList = '*(Belum ada murid di asrama ini)*';
+            } else {
+                let counter = 1;
+                houseList = membersInHouse.map(member => {
+                    const name = member.displayName;
+                    const item = `${house.emoji} **${name}**`;
+                    counter++;
+                    return item;
+                }).join('\n');
+            }
+
+            embed.addFields({
+                name: '\u200B',
+                value: `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n${house.emoji} **${house.name.toUpperCase()}** (${membersInHouse.size} Murid)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n${houseList}`,
+                inline: false
+            });
+        }
+
+        await message.channel.send({ embeds: [embed] });
+        return;
+    }
+
+    // AUTOMATIC XP SYSTEM (Chat Text - 15 XP Flat)
     if (userId !== OWNER_ID && !xpCooldowns.has(userId)) {
         try {
             let userDoc = await User.findOne({ userId, guildId: message.guild.id });
-            if (!userDoc) userDoc = new User({ userId, guildId: message.guild.id, xp: 0, level: 1, galleons: 0 });
+            if (!userDoc) {
+                userDoc = new User({ userId, guildId: message.guild.id, xp: 0, level: 1, galleons: 0 });
+            }
 
             if (userDoc.level >= 1000) return;
 
-            userDoc.xp += 5;
+            const xpGained = 15;
+            userDoc.xp += xpGained;
 
             if (userHouseObj) {
-                housePointsCache[userHouseObj.name] = (housePointsCache[userHouseObj.name] || 0) + 1;
+                houseCacheUpdate(userHouseObj.name, 1);
             }
 
             let xpNeeded = getXpNeededForNextLevel(userDoc.level);
             let levelUpOccurred = false;
+            let reachedLevelCheckpoint = false;
 
             while (userDoc.xp >= xpNeeded) {
                 userDoc.xp -= xpNeeded; 
                 userDoc.level += 1; 
                 xpNeeded = getXpNeededForNextLevel(userDoc.level);
                 levelUpOccurred = true;
+
+                if (userDoc.level % 5 === 0) {
+                    reachedLevelCheckpoint = true;
+                }
+
                 if (userDoc.level >= 1000) {
-                    userDoc.level = 1000; userDoc.xp = 0; break;
+                    userDoc.level = 1000;
+                    userDoc.xp = 0;
+                    break;
                 }
             }
 
-            if (levelUpOccurred && userDoc.level % 5 === 0) {
+            if (levelUpOccurred && reachedLevelCheckpoint) {
                 const newTitle = getWizardTitle(userDoc.level, userId);
                 const levelUpEmbed = new EmbedBuilder()
-                    .setColor(EMBED_COLOR)
+                    .setColor(EMBED_COLOR) 
                     .setTitle('✨ Hogwarts Academy Milestone!')
-                    .setDescription(`Selamat! <@${userId}> telah mencapai **Level ${userDoc.level}** dan kini bergelar **${newTitle}**! 🎓 Pencapaian luar biasa!`)
+                    .setDescription(`Selamat! <@${userId}> telah mencapai **Level ${userDoc.level}** dan kini bergelar **${newTitle}**! 🎓 Pencapaian yang luar biasa!`)
                     .setTimestamp();
-                
-                const channel = message.guild.channels.cache.get(LEVEL_UP_CHANNEL_ID);
-                if (channel) channel.send({ embeds: [levelUpEmbed] }).catch(() => {});
+
+                await levelUpChannel.send({ embeds: [levelUpEmbed] });
             }
 
             await userDoc.save();
+            
             xpCooldowns.add(userId);
             setTimeout(() => xpCooldowns.delete(userId), 60000);
+
         } catch (err) {
-            console.error('Error XP Chat:', err);
+            console.error('Masalah saat memproses XP Chat:', err);
         }
     }
 });
 
-client.on(Events.GuildMemberRemove, async (guild) => {
-    try {
-        await User.deleteMany({ guildId: guild.id });
-        console.log(`🧹 Semua data level dan ekonomi di-reset otomatis karena bot dikick dari server ${guild.name}.`);
-    } catch (err) {
-        console.error('Gagal menghapus data guild:', err);
+client.on(Events.InteractionCreate, async interaction => {
+    if (!interaction.isButton()) return;
+    if (interaction.customId !== 'sorting_hat') return;
+
+    const member = interaction.member;
+    const alreadySorted = HOUSES_DATA.some(house => member.roles.cache.has(house.id));
+
+    if (alreadySorted) {
+        return interaction.reply({ content: '🎩 You have already been sorted into a House!', ephemeral: true });
     }
+
+    const randomHouse = HOUSES_DATA[Math.floor(Math.random() * HOUSES_DATA.length)];
+    await member.roles.add(randomHouse.id);
+
+    await interaction.reply({ content: `🎩 The Sorting Hat has chosen...\n\n${randomHouse.emoji} ${randomHouse.name}!`, ephemeral: true });
 });
 
-client.login(process.env.DISCORD_TOKEN).catch(err => {
-    console.error('❌ Gagal melakukan login ke Discord Client:', err);
-});
+async function awaitDocSaveWithRetry(doc, retries = 3) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            await doc.save();
+            break;
+        } catch (err) {
+            if (i === retries - 1) throw err;
+            await new Promise(res => setTimeout(res, 500));
+        }
+    }
+}
+
+function housePointsCacheUpdate(houseName, points) {
+    housePointsCache[houseName] = (housePointsCache[houseName] || 0) + points;
+}
+
+function houseCacheUpdate(houseName, points) {
+    housePointsCache[houseName] = (housePointsCache[houseName] || 0) + points;
+}
+
+client.login(process.env.DISCORD_TOKEN);
