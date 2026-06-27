@@ -184,7 +184,48 @@ client.on(Events.MessageCreate, async (message) => {
     const isOwner = userId === OWNER_ID;
     const isSorted = !!userHouseObj;
 
-    // A. ADMIN COMMANDS (Khusus Lord / Owner Server)
+    // A. HELP DIRECTORY COMMAND
+    if (command === '!help') {
+        const helpEmbed = new EmbedBuilder()
+            .setColor(EMBED_COLOR)
+            .setTitle('📜 Hogwarts Academy - Command Directory')
+            .setDescription('Berikut adalah daftar mantra (*command*) yang dapat kamu gunakan di akademi sihir ini, dikelompokkan berdasarkan fungsinya:')
+            .addFields(
+                { 
+                    name: '🏰 Sistem Akademik & Informasi', 
+                    value: 
+                        '`!profile`        — Melihat tingkat sihir, gelar, dan progres XP.\n' +
+                        '`!student`        — Roster / daftar murid aktif tiap asrama.\n' +
+                        '`!leaderboard`    — Klasemen turnamen House Cup.'
+                },
+                { 
+                    name: '🪙 Sistem Keuangan & Dompet (Currency)', 
+                    value: 
+                        '`!absen`          — Mengambil tunjangan harian XP & Galleon.\n' +
+                        '`!cash`           — Memeriksa isi dompet sihir & pundi asrama.\n' +
+                        '`!send`           — Mengirimkan Galleon ke sesama murid.'
+                },
+                { 
+                    name: '🎲 Kasino Sihir & Perjudian (Gambling)', 
+                    value: 
+                        '`!toss <jumlah>`  — Coffin Toss, koin naga berhadiah x2 (Snitch/Bludger).\n' +
+                        '`!slot <jumlah>`  — Mesin Slot Gringotts, putar gulungan animasi & jackpot!'
+                },
+                { 
+                    name: '👑 Admin / Lord Command', 
+                    value: 
+                        '`!sortinghat`     — Memanggil The Sorting Hat (khusus Owner).\n' +
+                        '`!setlevel`       — Memanipulasi tingkat sihir (khusus Owner).\n' +
+                        '`!givepoint`      — Memberikan berkah poin asrama (khusus Owner).'
+                }
+            )
+            .setTimestamp()
+            .setFooter({ text: 'Hogwarts Academy Magic System', iconURL: client.user.displayAvatarURL() });
+
+        return message.channel.send({ embeds: [helpEmbed] });
+    }
+
+    // B. ADMIN COMMANDS (Khusus Lord / Owner Server)
     if (command === '!setlevel') {
         if (!isOwner) return message.reply('❌ Hanya Lord yang berhak memanipulasi tingkat sihir!');
         const targetUser = message.mentions.users.first();
@@ -261,7 +302,7 @@ client.on(Events.MessageCreate, async (message) => {
         }
     }
 
-    // B. CURRENCY SYSTEM (Absen, Cash, Send, Mini-Games)
+    // C. CURRENCY SYSTEM (Absen, Cash, Send)
     if (command === '!absen') {
         try {
             let userDoc = await User.findOne({ userId, guildId: message.guild.id });
@@ -625,7 +666,7 @@ client.on(Events.MessageCreate, async (message) => {
         return;
     }
 
-    // C. GENERAL MAGICAL COMMANDS
+    // D. GENERAL MAGICAL COMMANDS (Profile, Leaderboard, Student)
     if (command === '!profile') {
         const targetUser = message.mentions.users.first() || message.author;
         const targetMember = message.guild.members.cache.get(targetUser.id);
@@ -713,7 +754,6 @@ client.on(Events.MessageCreate, async (message) => {
         return message.channel.send({ embeds: [lbEmbed] });
     }
 
-    // C. ROSTER TERPADU !student
     if (command === '!student') {
         await message.guild.members.fetch();
 
