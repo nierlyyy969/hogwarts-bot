@@ -11,7 +11,7 @@ const {
     ComponentType
 } = require('discord.js');
 
-// Catatan: Pastikan path model User sesuai dengan direktori projectmu
+// Mengambil model User (Pastikan folder models dan file User.js ada di server)
 const User = require('./models/User'); 
 
 const client = new Client({
@@ -28,7 +28,8 @@ const client = new Client({
 // KONFIGURASI HOGWARTS & CACHE
 // ==========================================
 const OWNER_ID = '1180180812327559310'; 
-const LEVEL_UP_CHANNEL_ID = '1475801714425860272'; 
+// Fallback aman jika process.env gagal terbaca di hosting
+const LEVEL_UP_CHANNEL_ID = process.env.LEVELUP_CHANNEL_ID || '1475801714425860272'; 
 const EMBED_COLOR = '#25a5cf'; 
 const MAX_BET_LIMIT = 500000; 
 
@@ -39,7 +40,6 @@ const HOUSES_DATA = [
     { id: '1475787032759631965', name: 'Hufflepuff', emoji: '🦡', command: 'hufflepuff' }
 ];
 
-// Global Item Toko Sihir (Tome of Wisdom Dihilangkan sesuai permintaan)
 const SHOP_ITEMS = [
     // Slide 1: Ramuan / Potion
     { id: 'potion_felix', name: 'Felix Felicis (Ramuan Hoki)', type: 'potion', rarity: 'epic', price: 15000, desc: 'Meningkatkan hoki judi 10% selama 1 jam.' },
@@ -51,7 +51,7 @@ const SHOP_ITEMS = [
     // Slide 3: Makanan Pet
     { id: 'food_basic', name: 'Biji Labu Ajaib (Pakan Pet)', type: 'food', rarity: 'common', price: 100, desc: 'Makanan pokok untuk peliharaan.' },
     { id: 'food_premium', name: 'Daging Sapi Unicorn (Pakan Pet)', type: 'food', rarity: 'rare', price: 1200, desc: 'Makanan lezat penambah kesetiaan.' },
-    // Slide 4: Pet Shop (Basic sesuai ketentuan stock max)
+    // Slide 4: Pet Shop
     { id: 'pet_rat', name: 'Pet: Rat (Common)', type: 'pet', rarity: 'common', price: 2000, desc: 'Peliharaan tikus kecil yang penurut.' },
     { id: 'pet_toad', name: 'Pet: Toad (Common)', type: 'pet', rarity: 'common', price: 2500, desc: 'Katak peliharaan yang sering melompat.' },
     { id: 'pet_kneazle', name: 'Pet: Kneazle (Uncommon)', type: 'pet', rarity: 'uncommon', price: 7500, desc: 'Kucing hutan cerdas kerabat kneazle.' },
@@ -72,16 +72,12 @@ let housePointsCache = {
 };
 
 // ==========================================
-// KALKULASI LEVEL (Kurva Baru Level 500 & 1000)
+// KALKULASI LEVEL
 // ==========================================
 function getXpNeededForNextLevel(level) {
     if (level >= 9999) return 999999;
-    // Level 1-500 = 5-6 bulan, 500-1000 = 11-12 bulan
-    if (level < 500) {
-        return level * 25;
-    } else {
-        return level * 65;
-    }
+    if (level < 500) return level * 25;
+    return level * 65;
 }
 
 function getTotalXpRequirement(targetLevel) {
@@ -92,7 +88,6 @@ function getTotalXpRequirement(targetLevel) {
     return total;
 }
 
-// Fungsi Koreksi/Migrasi XP Level Lama ke Sistem Kurva Baru
 async function migrateUserLevel(userDoc) {
     const currentTotalXp = (userDoc.level ? getTotalXpRequirement(userDoc.level) : 0) + (userDoc.xp || 0);
     
@@ -144,9 +139,6 @@ function getWizardTitle(level, userId) {
     return 'New Student';
 }
 
-// ==========================================
-// GENERATOR GLOBAL STOCK SHOP ACAK (Rebutan)
-// ==========================================
 function generateRandomStock() {
     activeShopStock = [];
     
@@ -154,22 +146,19 @@ function generateRandomStock() {
         let maxStock = 0;
         const roll = Math.random() * 100;
 
-        // Batas Stok Item Sesuai Rarity & Aturan Rebutan Global
         if (item.rarity === 'common') {
-            if (roll < 70) maxStock = Math.floor(Math.random() * 7) + 1; // Max 7
+            if (roll < 70) maxStock = Math.floor(Math.random() * 7) + 1;
         } else if (item.rarity === 'uncommon') {
-            if (roll < 40) maxStock = Math.floor(Math.random() * 5) + 1; // Max 5
+            if (roll < 40) maxStock = Math.floor(Math.random() * 5) + 1;
         } else if (item.rarity === 'rare') {
-            if (roll < 15) maxStock = Math.floor(Math.random() * 4) + 1; // Max 4
+            if (roll < 15) maxStock = Math.floor(Math.random() * 4) + 1;
         } else if (item.rarity === 'epic') {
-            if (roll < 5) maxStock = Math.floor(Math.random() * 3) + 1; // Max 3
+            if (roll < 5) maxStock = Math.floor(Math.random() * 3) + 1;
         } else if (item.rarity === 'legendary') {
-            // Rasio Legend 96:1 (Spawn Rate ~1% setiap reset jam) Stok hanya 1
             if (roll < 1) maxStock = 1;
         }
 
         if (maxStock > 0) {
-            // Kode Unik 6 Digit (Huruf Kapital Semua + Angka)
             const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
             let uniqueCode = '';
             for (let i = 0; i < 6; i++) {
@@ -187,13 +176,17 @@ function generateRandomStock() {
 }
 
 // ==========================================
-// KONEKSI DATABASE & INISIALISASI BOT
+// KONEKSI DATABASE & INISIALISASI
 // ==========================================
-mongoose.connect(process.env.MONGO_URL || process.env.MONGODB_URI)
+const dbUrl = process.env.MONGO_URL || process.env.MONGODB_URI;
+if (!dbUrl) {
+    console.error("❌ PENTING: MONGODB_URI atau MONGO_URL belum diset di Variable Environment hostinganmu!");
+}
+
+mongoose.connect(dbUrl)
 .then(async () => {
     console.log('🔗 Connected to MongoDB Database successfully!');
     
-    // Penyesuaian / Migrasi Level Otomatis Saat Bot Online
     try {
         const allUsers = await User.find({});
         for (let u of allUsers) {
@@ -201,13 +194,18 @@ mongoose.connect(process.env.MONGO_URL || process.env.MONGODB_URI)
         }
         console.log('✅ Penyesuaian level murid ke sistem baru selesai dimigrasi!');
     } catch (migErr) {
-        console.error('❌ Gagal menjalankan migrasi level:', migErr);
+        console.error('❌ Gagal menjalankan migrasi level (diabaikan jika database kosong):', migErr.message);
     }
 
     generateRandomStock();
-    setInterval(generateRandomStock, 3600000); // Scheduler Reset Shop Tiap 1 Jam
+    setInterval(generateRandomStock, 3600000);
 
-    client.login(process.env.DISCORD_TOKEN);
+    const token = process.env.DISCORD_TOKEN;
+    if (!token) {
+        console.error("❌ PENTING: DISCORD_TOKEN belum diset di Variable Environment hostinganmu!");
+    } else {
+        client.login(token);
+    }
 }).catch(err => {
     console.error('❌ Failed to connect to MongoDB:', err);
 });
@@ -215,11 +213,12 @@ mongoose.connect(process.env.MONGO_URL || process.env.MONGODB_URI)
 client.once(Events.ClientReady, () => {
     console.log(`✨ Logged in as ${client.user.tag} — System online! ✨`);
 
-    // Voice XP Loop (Setiap 2.5 menit = 30 XP)
+    // Voice State Loop
     setInterval(async () => {
         try {
             const guilds = client.guilds.cache;
             for (const [guildId, guild] of guilds) {
+                if (!guild.voiceStates) continue;
                 guild.voiceStates.cache.forEach(async (voiceState) => {
                     const userId = voiceState.id;
 
@@ -258,7 +257,7 @@ client.once(Events.ClientReady, () => {
 
                         if (levelUpOccurred && userDoc.level % 5 === 0) {
                             const newTitle = getWizardTitle(userDoc.level, userId);
-                            const levelUpChannel = guild.channels.cache.get(LEVELUP_CHANNEL_ID);
+                            const levelUpChannel = guild.channels.cache.get(LEVEL_UP_CHANNEL_ID);
                             
                             if (levelUpChannel) {
                                 const levelUpEmbed = new EmbedBuilder()
@@ -280,7 +279,7 @@ client.once(Events.ClientReady, () => {
 });
 
 // ==========================================
-// MESSAGECREATE - SISTEM UTAMA & SELURUH COMMAND
+// MESSAGECREATE - SISTEM UTAMA & COMMAND
 // ==========================================
 client.on(Events.MessageCreate, async (message) => {
     if (message.author.bot || !message.guild) return;
@@ -289,9 +288,7 @@ client.on(Events.MessageCreate, async (message) => {
     const args = message.content.split(' ');
     const command = args[0].toLowerCase();
 
-    const levelUpChannel = message.guild.channels.cache.get(LEVELUP_CHANNEL_ID) || message.channel;
     const userHouseObj = HOUSES_DATA.find(h => message.member.roles.cache.has(h.id));
-
     const isOwner = userId === OWNER_ID;
 
     const checkAndSetCooldown = async (cmdName) => {
@@ -330,7 +327,6 @@ client.on(Events.MessageCreate, async (message) => {
         return false;
     };
 
-    // Directory Help
     if (command === '!help') {
         const helpEmbed = new EmbedBuilder()
             .setColor(EMBED_COLOR)
@@ -346,9 +342,6 @@ client.on(Events.MessageCreate, async (message) => {
         return message.channel.send({ embeds: [helpEmbed] });
     }
 
-    // ==========================================================
-    // ABSEN, CASH, & SEND GALLEONS (Sistem Ekonomi)
-    // ==========================================================
     if (command === '!absen') {
         if (userId === OWNER_ID) return message.reply('Owner tidak bisa absen.');
         let userDoc = await User.findOne({ userId, guildId: message.guild.id });
@@ -412,9 +405,6 @@ client.on(Events.MessageCreate, async (message) => {
         return message.reply(`✅ Berhasil mengirim **${amount.toLocaleString()} Galleons** kepada <@${targetUser.id}>.`);
     }
 
-    // ==========================================================
-    // 🛒 SISTEM SHOP (Global Stock Rebutan, Slide Buttons)
-    // ==========================================================
     if (command === '!shop') {
         let userDoc = await User.findOne({ userId, guildId: message.guild.id });
         if (!userDoc) {
@@ -467,7 +457,6 @@ client.on(Events.MessageCreate, async (message) => {
             return embed;
         };
 
-        // Panel Atas Tombol Biru (Primary), Panel Bawah Success
         const getNavRows = (slide) => {
             const rowUpper = new ActionRowBuilder();
             if (slide === 1) {
@@ -506,9 +495,7 @@ client.on(Events.MessageCreate, async (message) => {
             } else if (i.customId === 'prev_slide' && currentSlide > 1) {
                 currentSlide--;
                 await i.update({ embeds: [generateShopEmbed(currentSlide)], components: getNavRows(currentSlide) });
-            } 
-            // PANEL KEDUA: Tombol Back Biru di Atas (Panel Beli Item)
-            else if (i.customId === 'buy_panel') {
+            } else if (i.customId === 'buy_panel') {
                 const panel2Embed = new EmbedBuilder()
                     .setColor(EMBED_COLOR)
                     .setTitle('🛒 Panel Pembelian - Masukkan Kode Item')
@@ -520,9 +507,7 @@ client.on(Events.MessageCreate, async (message) => {
                 );
 
                 await i.update({ embeds: [panel2Embed], components: [backRow] });
-            } 
-            // Tombol Back Panel Kedua
-            else if (i.customId === 'back_to_shop') {
+            } else if (i.customId === 'back_to_shop') {
                 await i.update({ embeds: [generateShopEmbed(currentSlide)], components: getNavRows(currentSlide) });
             }
         });
@@ -533,7 +518,6 @@ client.on(Events.MessageCreate, async (message) => {
         return;
     }
 
-    // SUB-HANDLER SHOP INPUT KODE (Verifikasi Button Jumlah: 1, 5, 10, All)
     if (command.startsWith('!shopcode')) {
         const inputCode = args[1];
         if (!inputCode) return message.reply('🔮 Masukkan format kode: `!shopcode <kode_item>`');
@@ -550,7 +534,6 @@ client.on(Events.MessageCreate, async (message) => {
             .setDescription(`Harga Satuan: **${itemObj.price.toLocaleString()} G**\nStok Tersisa: **${itemObj.stock}**\n\nPilih jumlah yang ingin dibeli:`)
             .setTimestamp();
 
-        // 4 Button Kuantitas
         const countRow = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`buy_qty_1_${itemObj.stockCode}`).setLabel('1').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId(`buy_qty_5_${itemObj.stockCode}`).setLabel('5').setStyle(ButtonStyle.Secondary),
@@ -594,7 +577,6 @@ client.on(Events.MessageCreate, async (message) => {
                     return i.reply({ content: `🪙 **Galleons tidak cukup!** Total harga untuk ${qty} item adalah ${totalPrice.toLocaleString()} G.`, ephemeral: true });
                 }
 
-                // Panel Verifikasi Akhir (Buy Hijau, Cancel Merah)
                 const finalEmbed = new EmbedBuilder()
                     .setColor(EMBED_COLOR)
                     .setTitle('💳 Konfirmasi Pembayaran')
@@ -607,15 +589,11 @@ client.on(Events.MessageCreate, async (message) => {
                 );
 
                 await i.update({ embeds: [finalEmbed], components: [confirmActionRow] });
-            } 
-            // Button Cancel Langsung Menghapus Chat
-            else if (i.customId === 'cancel_buy') {
+            } else if (i.customId === 'cancel_buy') {
                 await verifyMsg.delete().catch(() => {});
                 const cancelEmbed = new EmbedBuilder().setColor(EMBED_COLOR).setTitle('❌ Transaksi Dibatalkan').setDescription('Pesan verifikasi & transaksi dibatalkan.');
                 return message.channel.send({ embeds: [cancelEmbed] });
-            } 
-            // Button Buy Hijau (Pesan kehapus & muncul embed telah membeli)
-            else if (i.customId.startsWith('confirm_buy_')) {
+            } else if (i.customId.startsWith('confirm_buy_')) {
                 const parts = i.customId.split('_');
                 const code = parts[2];
                 const qty = parseInt(parts[3]);
@@ -626,7 +604,6 @@ client.on(Events.MessageCreate, async (message) => {
                 userDoc.galleons -= totalPrice;
                 refItem.stock -= qty;
                 
-                // Simpan Item ke Inventaris User (Database)
                 if (refItem.type === 'potion') {
                     userDoc.potions = userDoc.potions || [];
                     userDoc.potions.push({ id: refItem.id, name: refItem.name });
@@ -655,9 +632,6 @@ client.on(Events.MessageCreate, async (message) => {
         return;
     }
 
-    // ==========================================================
-    // GELAR / TITLE COMMANDS
-    // ==========================================================
     if (command === '!title') {
         let userDoc = await User.findOne({ userId, guildId: message.guild.id });
         if (!userDoc || !userDoc.titles || userDoc.titles.length === 0) {
@@ -690,9 +664,6 @@ client.on(Events.MessageCreate, async (message) => {
         return message.reply(`✅ Berhasil memasang gelar **${targetTitle.name}** pada jubah sihirmu!`);
     }
 
-    // ==========================================================
-    // 🐾 PET SYSTEM (Equip, Profile, Feed Panel Langkah)
-    // ==========================================================
     if (command === '!pet') {
         let userDoc = await User.findOne({ userId, guildId: message.guild.id });
         if (!userDoc || !userDoc.pets || userDoc.pets.length === 0) {
@@ -706,7 +677,7 @@ client.on(Events.MessageCreate, async (message) => {
         });
         desc += '\n*Gunakan `!petequip <kode>` untuk membawa peliharaanmu.*';
 
-        const embed = new EmbedBuilder().setColor(EMBED_COLOR).setTitle('🐾 Kandang Peliharaan Anda').setDescription(desc);
+        const embed = new EmbedBuilder().setColor(EMBED_COLOR).setTitle('Канданг Peliharaan Anda').setDescription(desc);
         return message.channel.send({ embeds: [embed] });
     }
 
@@ -727,7 +698,6 @@ client.on(Events.MessageCreate, async (message) => {
         return message.reply(`🪄 Berhasil memanggil dan memakai peliharaan: **${targetPet.name}**!`);
     }
 
-    // FEED PET - Panel Langkah Interaktif (Button Pilih Pet, Pilih Makanan, Qty: 1x, x5, x10, Close)
     if (command === '!feedpet') {
         let userDoc = await User.findOne({ userId, guildId: message.guild.id });
         if (!userDoc || !userDoc.pets || userDoc.pets.length === 0) {
@@ -738,7 +708,6 @@ client.on(Events.MessageCreate, async (message) => {
             return message.reply('🍗 Ransel makananmu kosong! Silakan beli makanan pet di `!shop` terlebih dahulu.');
         }
 
-        // Panel 1: Tombol Pilih Pet
         const embedPet = new EmbedBuilder().setColor(EMBED_COLOR).setTitle('🐾 Pilih Peliharaan').setDescription('Pilih hewan peliharaan mana yang ingin kamu beri makan:');
         const rowPet = new ActionRowBuilder();
         userDoc.pets.forEach((p, idx) => {
@@ -756,7 +725,6 @@ client.on(Events.MessageCreate, async (message) => {
             if (i.customId.startsWith('feed_pet_')) {
                 selectedPetIndex = parseInt(i.customId.split('_')[2]);
                 
-                // Panel 2: Pilih Makanan
                 const embedFood = new EmbedBuilder().setColor(EMBED_COLOR).setTitle('🍗 Pilih Jenis Makanan').setDescription('Pilih pakan untuk peliharaanmu:');
                 const rowFood = new ActionRowBuilder();
                 userDoc.foods.forEach((f, idx) => {
@@ -765,9 +733,7 @@ client.on(Events.MessageCreate, async (message) => {
                 rowFood.addComponents(new ButtonBuilder().setCustomId('close_feed').setLabel('Close').setStyle(ButtonStyle.Danger));
 
                 await i.update({ embeds: [embedFood], components: [rowFood] });
-            } 
-            // Panel 3: Kuantitas (1x, x5, x10, Close)
-            else if (i.customId.startsWith('feed_food_')) {
+            } else if (i.customId.startsWith('feed_food_')) {
                 const foodIndex = parseInt(i.customId.split('_')[2]);
                 const foodItem = userDoc.foods[foodIndex];
 
@@ -780,9 +746,7 @@ client.on(Events.MessageCreate, async (message) => {
                 );
 
                 await i.update({ embeds: [embedQty], components: [rowQty] });
-            } 
-            // Eksekusi Feed Button (Pesan terhapus & konfirmasi success)
-            else if (i.customId.startsWith('feed_act_')) {
+            } else if (i.customId.startsWith('feed_act_')) {
                 const parts = i.customId.split('_');
                 const qty = parseInt(parts[2]);
                 const pIdx = parseInt(parts[3]);
@@ -803,18 +767,13 @@ client.on(Events.MessageCreate, async (message) => {
 
                 await msg.delete().catch(() => {});
                 return message.channel.send({ embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle('✅ Sukses Memberi Makan').setDescription(`Peliharaan **${userDoc.pets[pIdx].name}** telah diberi makan sebanyak **${qty} kali**.`)] });
-            } 
-            // Button Close Panel Feed
-            else if (i.customId === 'close_feed') {
+            } else if (i.customId === 'close_feed') {
                 await msg.delete().catch(() => {});
             }
         });
         return;
     }
 
-    // ==========================================================
-    // KASINO SIHIR
-    // ==========================================================
     if (command === '!toss') {
         const betAmount = parseInt(args[1]);
         if (isNaN(betAmount) || betAmount <= 0) return message.channel.send({ embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle('🔮 Format Coffin Toss Salah').setDescription('Gunakan: `!toss <jumlah>`')] });
@@ -957,7 +916,6 @@ client.on(Events.MessageCreate, async (message) => {
                 }
             } else if (i.customId === 'snap_open') {
                 c.stop(); runAI();
-                // Persentase Kemenangan Bot (65%) dan User (35%)
                 if (Math.random() < 0.35 ? (pTotal <= 21 && pTotal > bTotal) : false) {
                     userDoc.galleons += betAmount;
                 } else {
@@ -1004,9 +962,6 @@ client.on(Events.MessageCreate, async (message) => {
         return;
     }
 
-    // ==========================================================
-    // MAGICAL PROFILE WIZARD
-    // ==========================================================
     if (command === '!profile') {
         const targetUser = message.mentions.users.first() || message.author;
         const targetMember = message.guild.members.cache.get(targetUser.id);
@@ -1063,7 +1018,6 @@ client.on(Events.MessageCreate, async (message) => {
         return;
     }
 
-    // Chat Text XP Flat (5 XP setiap text message untuk non-owner)
     if (userId !== OWNER_ID && !xpCooldowns.has(userId)) {
         try {
             let userDoc = await User.findOne({ userId, guildId: message.guild.id });
@@ -1098,7 +1052,7 @@ client.on(Events.MessageCreate, async (message) => {
                     .setDescription(`Selamat! <@${userId}> telah mencapai **Level ${userDoc.level}** dan kini bergelar **${newTitle}**! 🎓 Pencapaian luar biasa!`)
                     .setTimestamp();
                 
-                const channel = message.guild.channels.cache.get(LEVELUP_CHANNEL_ID);
+                const channel = message.guild.channels.cache.get(LEVEL_UP_CHANNEL_ID);
                 if (channel) channel.send({ embeds: [levelUpEmbed] }).catch(() => {});
             }
 
@@ -1111,21 +1065,15 @@ client.on(Events.MessageCreate, async (message) => {
     }
 });
 
-// ==========================================
-// KICK GUILD CLEANUP
-// ==========================================
 client.on(Events.GuildMemberRemove, async (guild) => {
     try {
         await User.deleteMany({ guildId: guild.id });
-        console.log(`🧹 Semua data level dan ekonomi di-reset otomatis karena bot di-kick dari server ${guild.name}.`);
+        console.log(`🧹 Semua data level dan ekonomi di-reset otomatis karena bot dikick dari server ${guild.name}.`);
     } catch (err) {
         console.error('Gagal menghapus data guild:', err);
     }
 });
 
-// ==========================================
-// EKSEKUSI LOGIN BOT (Bagian Paling Bawah)
-// ==========================================
 client.login(process.env.DISCORD_TOKEN).catch(err => {
     console.error('❌ Gagal melakukan login ke Discord Client:', err);
 });
