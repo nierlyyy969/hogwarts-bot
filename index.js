@@ -188,11 +188,11 @@ client.on(Events.MessageCreate, async (message) => {
     const isOwner = userId === OWNER_ID;
     const isSorted = !!userHouseObj;
 
-    // Fungsi Cooldown Check
+    // Fungsi Cooldown Check (Diubah menjadi 10 Detik)
     const checkAndSetCooldown = (cmdName) => {
         if (isOwner) return false; // Owner bebas cooldown
         const now = Date.now();
-        const cooldownAmount = 5000; // 5 detik dalam milidetik
+        const cooldownAmount = 10000; // 10 detik dalam milidetik
         const timestamps = gamblingCooldowns.get(cmdName);
 
         if (timestamps && timestamps.has(userId)) {
@@ -232,7 +232,7 @@ client.on(Events.MessageCreate, async (message) => {
                         '`!send <@User> <jumlah>`'
                 },
                 { 
-                    name: '🎲 Kasino Sihir & Perjudian (Gambling) — *Max Bet: 500.000 G | Cooldown: 5s*', 
+                    name: '🎲 Kasino Sihir & Perjudian (Gambling) — *Max Bet: 500.000 G | Cooldown: 10s*', 
                     value: 
                         '`!toss <jumlah>`\n' +
                         '`!slot <jumlah>`\n' +
@@ -540,7 +540,7 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [formatToss] });
         }
 
-        // Cek Cooldown 5 Detik Ditaruh Paling Atas
+        // --- CEK COOLDOWN 10 DETIK LANGSUNG DI SINI ---
         const cdRemaining = checkAndSetCooldown('toss');
         if (cdRemaining) {
             return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum melakukan Coffin Toss berikutnya.`);
@@ -634,7 +634,7 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [formatSlot] });
         }
 
-        // Cek Cooldown 5 Detik Ditaruh Paling Atas
+        // --- CEK COOLDOWN 10 DETIK LANGSUNG DI SINI ---
         const cdRemaining = checkAndSetCooldown('slot');
         if (cdRemaining) {
             return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum memutar Mesin Slot berikutnya.`);
@@ -735,7 +735,7 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [formatG] });
         }
 
-        // Cek Cooldown 5 Detik Ditaruh Paling Atas
+        // --- CEK COOLDOWN 10 DETIK LANGSUNG DI SINI ---
         const cdRemaining = checkAndSetCooldown('gobs');
         if (cdRemaining) {
             return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum melempar dadu Gobstones berikutnya.`);
@@ -832,7 +832,7 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [formatS] });
         }
 
-        // Cek Cooldown 5 Detik Ditaruh Paling Atas
+        // --- CEK COOLDOWN 10 DETIK LANGSUNG DI SINI ---
         const cdRemaining = checkAndSetCooldown('snap');
         if (cdRemaining) {
             return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum memulai permainan Exploding Snap berikutnya.`);
@@ -1004,7 +1004,7 @@ client.on(Events.MessageCreate, async (message) => {
             return message.channel.send({ embeds: [formatSn] });
         }
 
-        // Cek Cooldown 5 Detik Ditaruh Paling Atas
+        // --- CEK COOLDOWN 10 DETIK LANGSUNG DI SINI ---
         const cdRemaining = checkAndSetCooldown('snitch');
         if (cdRemaining) {
             return message.reply(`⏳ Tahan tongkat sihirmu! Harap tunggu **${cdRemaining} detik** lagi sebelum mengejar Golden Snitch berikutnya.`);
